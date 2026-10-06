@@ -137,7 +137,7 @@ ros2 launch hand_tracking_robot dual_arm_hand_teleop.launch.py \
 | `smooth_alpha` | `0.45` | 一阶低通系数，0 关闭 |
 | `tf_translation` | `[0,0,0]` | Quest 原点在机器人基座下位置 |
 | `tf_rotation` | `[1,0,0,0]` | Quest 原点在机器人基座下姿态 `[w,x,y,z]` |
-| `unity_to_robot` | `[0,0,-1,-1,0,0,0,1,0]` | Unity 左手系到 ROS 右手系 3x3 映射 |
+| `unity_to_robot` | `[0.0, 0.0, -1.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0]` | Unity 左手系到 ROS 右手系 3x3 映射 |
 
 例子：手移动 10 cm 只让机械臂移动 5 cm，且捏合更灵敏：
 

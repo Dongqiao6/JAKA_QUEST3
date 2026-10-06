@@ -46,7 +46,7 @@ def generate_launch_description():
     enable_right_arg = DeclareLaunchArgument(
         'enable_right', default_value='true', description='Publish right-arm targets')
     unity_to_robot_arg = DeclareLaunchArgument(
-        'unity_to_robot', default_value='[0,0,-1, -1,0,0, 0,1,0]',
+        'unity_to_robot', default_value='[0.0, 0.0, -1.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0]',
         description='3x3 row-major Unity LH -> robot RH rotation')
     tf_translation_arg = DeclareLaunchArgument(
         'tf_translation', default_value='[0.0, 0.0, 0.0]',

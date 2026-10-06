@@ -111,18 +111,18 @@ class HandTrackingBridge(Node):
         unity_to_robot = _parse_float_list(
             self.declare_parameter(
                 "unity_to_robot",
-                "[0,0,-1, -1,0,0, 0,1,0]",
+                [0.0, 0.0, -1.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0],
             ).value,
             expected=9,
         )
         self.unity_to_robot = unity_to_robot.reshape(3, 3)
 
         tf_translation = _parse_float_list(
-            self.declare_parameter("tf_translation", "[0.0, 0.0, 0.0]").value,
+            self.declare_parameter("tf_translation", [0.0, 0.0, 0.0]).value,
             expected=3,
         )
         tf_rotation = _parse_float_list(
-            self.declare_parameter("tf_rotation", "[1.0, 0.0, 0.0, 0.0]").value,
+            self.declare_parameter("tf_rotation", [1.0, 0.0, 0.0, 0.0]).value,
             expected=4,
         )
         self.tf_translation = tf_translation
