@@ -97,8 +97,8 @@ class HandTrackingBridge(Node):
         self.position_source = str(self.declare_parameter("position_source", "wrist").value).lower()
         if self.position_source not in ("wrist", "index_tip", "pinch_midpoint"):
             self.get_logger().warn(
-                "unsupported position_source '%s', falling back to 'wrist'",
-                self.position_source,
+                "unsupported position_source '%s', falling back to 'wrist'"
+                % self.position_source,
             )
             self.position_source = "wrist"
 
@@ -154,15 +154,17 @@ class HandTrackingBridge(Node):
         self._start_network()
         self.get_logger().info(
             "hand_tracking_bridge started: protocol=%s %s:%d, source=%s, "
-            "left=%s, right=%s, buttons=%s, rate=%.1f Hz",
-            self.protocol,
-            self.host,
-            self.port,
-            self.position_source,
-            left_topic,
-            right_topic,
-            button_topic,
-            self.publish_rate,
+            "left=%s, right=%s, buttons=%s, rate=%.1f Hz"
+            % (
+                self.protocol,
+                self.host,
+                self.port,
+                self.position_source,
+                left_topic,
+                right_topic,
+                button_topic,
+                self.publish_rate,
+            )
         )
 
     # ------------------------------------------------------------------
@@ -204,10 +206,14 @@ class HandTrackingBridge(Node):
         try:
             sock.bind((self.host, self.port))
         except OSError as exc:
-            self.get_logger().error("cannot bind UDP %s:%d: %s", self.host, self.port, exc)
+            self.get_logger().error(
+                "cannot bind UDP %s:%d: %s" % (self.host, self.port, exc)
+            )
             return
         sock.settimeout(0.5)
-        self.get_logger().info("listening for HTS UDP on %s:%d", self.host, self.port)
+        self.get_logger().info(
+            "listening for HTS UDP on %s:%d" % (self.host, self.port)
+        )
         while not self._stop.is_set():
             try:
                 data, _addr = sock.recvfrom(65536)
@@ -224,11 +230,15 @@ class HandTrackingBridge(Node):
         try:
             server.bind((self.host, self.port))
         except OSError as exc:
-            self.get_logger().error("cannot bind TCP %s:%d: %s", self.host, self.port, exc)
+            self.get_logger().error(
+                "cannot bind TCP %s:%d: %s" % (self.host, self.port, exc)
+            )
             return
         server.listen(5)
         server.settimeout(0.5)
-        self.get_logger().info("listening for HTS TCP on %s:%d", self.host, self.port)
+        self.get_logger().info(
+            "listening for HTS TCP on %s:%d" % (self.host, self.port)
+        )
         while not self._stop.is_set():
             try:
                 conn, addr = server.accept()
@@ -242,7 +252,7 @@ class HandTrackingBridge(Node):
         server.close()
 
     def _tcp_conn_loop(self, conn: socket.socket, addr) -> None:
-        self.get_logger().info("HTS TCP connection from %s", addr)
+        self.get_logger().info("HTS TCP connection from %s" % (addr,))
         conn.settimeout(0.5)
         buffer = ""
         with conn:
@@ -386,11 +396,8 @@ class HandTrackingBridge(Node):
         if self._publish_count % 50 == 0:
             self.get_logger().info(
                 "bridge active: left_pinch=%.0f right_pinch=%.0f "
-                "(left_fresh=%s right_fresh=%s)",
-                left_pinch,
-                right_pinch,
-                left_fresh,
-                right_fresh,
+                "(left_fresh=%s right_fresh=%s)"
+                % (left_pinch, right_pinch, left_fresh, right_fresh),
             )
 
     def shutdown(self) -> None:
