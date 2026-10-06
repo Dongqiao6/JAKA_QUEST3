@@ -1,0 +1,11 @@
+说明：在quest3的apk中，捏一下手指是代表点击的意思
+
+
+在QUEST3运行apk:
+adb shell monkey -p com.wengmister.handtrackingstreamer 1
+
+停止在QUEST3运行代码
+1、找到包名
+adb shell pm list packages | grep handtracking
+2、强制停止
+adb shell am force-stop com.wengmister.handtrackingstreamer

@@ -1,0 +1,29 @@
+hand_tracking_bridge:
+  ros__parameters:
+    protocol: udp
+    host: 0.0.0.0
+    port: 9000
+    publish_rate: 100.0
+    smooth_alpha: 0.45
+    motion_scale: 1.0
+    pinch_threshold: 0.035
+    pinch_release_ratio: 1.5
+    tracking_timeout: 1.0
+    position_source: wrist
+
+    left_target_topic: /rc_ctrl/left_target
+    right_target_topic: /rc_ctrl/right_target
+    button_topic: /rc_ctrl/button
+    enable_left: true
+    enable_right: true
+
+    glasses_frame: quest
+    robot_base_frame: world
+
+    # Unity LH -> robot RH, row-major. Default matches JAKA quest_reader:
+    # (x, y, z) -> (-z, -x, y)
+    unity_to_robot: [0.0, 0.0, -1.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0]
+
+    # Calibration: pose of the Quest origin in robot base.
+    tf_translation: [0.0, 0.0, 0.0]
+    tf_rotation: [1.0, 0.0, 0.0, 0.0]
