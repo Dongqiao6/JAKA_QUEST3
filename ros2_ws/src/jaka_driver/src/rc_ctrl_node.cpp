@@ -138,13 +138,13 @@ void pose_to_ctrl(const geometry_msgs::msg::PoseStamped &msg,
 // These software clamps are kept intentionally low. The JAKA controller's
 // non-linear filter (servo_move_use_carte_NLF) is configured in bring_up_arm()
 // and provides a second, harder bound on velocity/acceleration/jerk.
-double servo_tran_deadband = 0.5;    // mm: ignore smaller translation deltas
+double servo_tran_deadband = 0.25;   // mm: ignore smaller translation deltas
 double servo_rot_deadband = 0.005;   // rad (~0.29 deg): ignore smaller rotation deltas
-double servo_max_tran_step = 0.5;    // mm per cycle -> ~62.5 mm/s before NLF
+double servo_max_tran_step = 0.75;   // mm per cycle -> ~93.75 mm/s before NLF
 double servo_max_rot_step = 0.005;   // rad per cycle -> ~35.8 deg/s before NLF
-double max_cart_vel_mm_s = 60.0;     // Cartesian speed limit (mm/s)
-double max_cart_acc_mm_s2 = 60.0;    // Cartesian acceleration limit (mm/s^2)
-double max_cart_jerk_mm_s3 = 120.0;  // Cartesian jerk limit (mm/s^3)
+double max_cart_vel_mm_s = 80.0;     // Cartesian speed limit (mm/s)
+double max_cart_acc_mm_s2 = 80.0;    // Cartesian acceleration limit (mm/s^2)
+double max_cart_jerk_mm_s3 = 160.0;  // Cartesian jerk limit (mm/s^3)
 double max_rot_vel_deg_s = 20.0;     // orientation speed limit (deg/s)
 double max_rot_acc_deg_s2 = 40.0;    // orientation acceleration limit (deg/s^2)
 double max_rot_jerk_deg_s3 = 80.0;   // orientation jerk limit (deg/s^3)
@@ -719,13 +719,13 @@ int main(int argc, char *argv[])
    debug = node->declare_parameter<bool>("debug", false);
    use_rpy_ctrl = node->declare_parameter<bool>("use_rpy_ctrl", false);
    enable_y_limit = node->declare_parameter<bool>("enable_y_limit", true);
-   servo_tran_deadband = node->declare_parameter<double>("servo_tran_deadband_mm", 0.5);
+   servo_tran_deadband = node->declare_parameter<double>("servo_tran_deadband_mm", 0.25);
    servo_rot_deadband = node->declare_parameter<double>("servo_rot_deadband_rad", 0.005);
-   servo_max_tran_step = node->declare_parameter<double>("servo_max_tran_step_mm", 0.5);
+   servo_max_tran_step = node->declare_parameter<double>("servo_max_tran_step_mm", 0.75);
    servo_max_rot_step = node->declare_parameter<double>("servo_max_rot_step_rad", 0.005);
-   max_cart_vel_mm_s = node->declare_parameter<double>("max_cart_vel_mm_s", 60.0);
-   max_cart_acc_mm_s2 = node->declare_parameter<double>("max_cart_acc_mm_s2", 60.0);
-   max_cart_jerk_mm_s3 = node->declare_parameter<double>("max_cart_jerk_mm_s3", 120.0);
+   max_cart_vel_mm_s = node->declare_parameter<double>("max_cart_vel_mm_s", 80.0);
+   max_cart_acc_mm_s2 = node->declare_parameter<double>("max_cart_acc_mm_s2", 80.0);
+   max_cart_jerk_mm_s3 = node->declare_parameter<double>("max_cart_jerk_mm_s3", 160.0);
    max_rot_vel_deg_s = node->declare_parameter<double>("max_rot_vel_deg_s", 20.0);
    max_rot_acc_deg_s2 = node->declare_parameter<double>("max_rot_acc_deg_s2", 40.0);
    max_rot_jerk_deg_s3 = node->declare_parameter<double>("max_rot_jerk_deg_s3", 80.0);

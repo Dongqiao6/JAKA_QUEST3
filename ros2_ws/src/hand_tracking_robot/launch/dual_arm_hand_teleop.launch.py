@@ -23,19 +23,19 @@ def generate_launch_description():
         'enable_y_limit', default_value='true',
         description='Keep the two arms from crossing the shared center line')
     servo_tran_deadband_arg = DeclareLaunchArgument(
-        'servo_tran_deadband', default_value='0.5')
+        'servo_tran_deadband', default_value='0.25')
     servo_rot_deadband_arg = DeclareLaunchArgument(
         'servo_rot_deadband', default_value='0.005')
     servo_max_tran_step_arg = DeclareLaunchArgument(
-        'servo_max_tran_step', default_value='0.5')
+        'servo_max_tran_step', default_value='0.75')
     servo_max_rot_step_arg = DeclareLaunchArgument(
         'servo_max_rot_step', default_value='0.005')
     max_cart_vel_arg = DeclareLaunchArgument(
-        'max_cart_vel', default_value='60.0')
+        'max_cart_vel', default_value='80.0')
     max_cart_acc_arg = DeclareLaunchArgument(
-        'max_cart_acc', default_value='60.0')
+        'max_cart_acc', default_value='80.0')
     max_cart_jerk_arg = DeclareLaunchArgument(
-        'max_cart_jerk', default_value='120.0')
+        'max_cart_jerk', default_value='160.0')
     max_rot_vel_arg = DeclareLaunchArgument(
         'max_rot_vel', default_value='20.0')
     max_rot_acc_arg = DeclareLaunchArgument(
@@ -47,8 +47,8 @@ def generate_launch_description():
     host_arg = DeclareLaunchArgument('host', default_value='0.0.0.0')
     port_arg = DeclareLaunchArgument('port', default_value='9000')
     publish_rate_arg = DeclareLaunchArgument('publish_rate', default_value='100.0')
-    smooth_alpha_arg = DeclareLaunchArgument('smooth_alpha', default_value='0.30')
-    motion_scale_arg = DeclareLaunchArgument('motion_scale', default_value='0.30')
+    smooth_alpha_arg = DeclareLaunchArgument('smooth_alpha', default_value='0.45')
+    motion_scale_arg = DeclareLaunchArgument('motion_scale', default_value='0.40')
     pinch_threshold_arg = DeclareLaunchArgument('pinch_threshold', default_value='0.035')
     position_source_arg = DeclareLaunchArgument('position_source', default_value='wrist')
     enable_left_arg = DeclareLaunchArgument('enable_left', default_value='true')

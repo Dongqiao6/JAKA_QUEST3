@@ -18,10 +18,10 @@ def generate_launch_description():
     publish_rate_arg = DeclareLaunchArgument(
         'publish_rate', default_value='100.0', description='Pose/Joy publish rate (Hz)')
     smooth_alpha_arg = DeclareLaunchArgument(
-        'smooth_alpha', default_value='0.30',
+        'smooth_alpha', default_value='0.45',
         description='Position/quaternion EMA factor (0 disables filtering)')
     motion_scale_arg = DeclareLaunchArgument(
-        'motion_scale', default_value='0.30',
+        'motion_scale', default_value='0.40',
         description='Scale applied to the hand displacement')
     pinch_threshold_arg = DeclareLaunchArgument(
         'pinch_threshold', default_value='0.035',

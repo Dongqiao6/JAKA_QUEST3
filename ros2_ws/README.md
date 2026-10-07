@@ -5,10 +5,10 @@
 
 默认配置已按“先慢后快、先单臂后双臂”的安全原则调整：
 
-- 手部位移到机械臂位移的比例 `motion_scale` 默认是 `0.30`，不是 1:1。
-- 位置 EMA 滤波 `smooth_alpha` 默认是 `0.30`，抑制手抖。
-- 机械臂笛卡尔速度上限 `60 mm/s`、加速度上限 `60 mm/s²`、加加速度上限 `120 mm/s³`。
-- 每次 `servo_p` 的最大平移增量 `0.5 mm`、最大姿态增量 `0.005 rad`。
+- 手部位移到机械臂位移的比例 `motion_scale` 默认是 `0.40`，不是 1:1。
+- 位置 EMA 滤波 `smooth_alpha` 默认是 `0.45`，兼顾跟手和抑制手抖。
+- 机械臂笛卡尔速度上限 `80 mm/s`、加速度上限 `80 mm/s²`、加加速度上限 `160 mm/s³`。
+- 每次 `servo_p` 的最大平移增量 `0.75 mm`、最大姿态增量 `0.005 rad`。
 - 姿态随动 `use_rpy_ctrl` 默认关闭，第一次测试只做平移。
 
 ## 目录
@@ -66,7 +66,7 @@ python3 -m pytest src/hand_tracking_robot/test/test_hts_parser.py
 ```bash
 source install/setup.bash
 ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
-  enable_left:=true enable_right:=true motion_scale:=0.30
+  enable_left:=true enable_right:=true motion_scale:=0.40
 ```
 
 终端 B 发送假手数据：
@@ -107,7 +107,7 @@ ros2 topic echo /rc_ctrl/right_target
 ```bash
 source ros2_ws/install/setup.bash
 ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
-  enable_left:=true enable_right:=false motion_scale:=0.30
+  enable_left:=true enable_right:=false motion_scale:=0.40
 ```
 
 终端 B 启动 JAKA 控制：
@@ -117,7 +117,7 @@ source ros2_ws/install/setup.bash
 ros2 launch jaka_driver RC_ctrl.launch.py \
   robot_left_ip:=192.168.71.37 robot_right_ip:=192.168.71.36 \
   use_rpy_ctrl:=false enable_y_limit:=true \
-  max_cart_vel:=60.0 max_cart_acc:=60.0
+  max_cart_vel:=80.0 max_cart_acc:=80.0
 ```
 
 确认日志依次出现 `left login OK`、`left power_on OK`、`left enable_robot OK`、
@@ -137,7 +137,7 @@ ros2 launch jaka_driver RC_ctrl.launch.py \
 
 ```bash
 ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
-  enable_left:=false enable_right:=true motion_scale:=0.30
+  enable_left:=false enable_right:=true motion_scale:=0.40
 ```
 
 `RC_ctrl.launch.py` 仍同时登录左右臂；只有右臂能收到目标并随动。
@@ -148,7 +148,7 @@ Quest App 手模式改 **Dual/Both**，两个桥接都打开：
 
 ```bash
 ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
-  enable_left:=true enable_right:=true motion_scale:=0.30
+  enable_left:=true enable_right:=true motion_scale:=0.40
 ```
 
 或用一键启动：
@@ -156,7 +156,7 @@ ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
 ```bash
 ros2 launch hand_tracking_robot dual_arm_hand_teleop.launch.py \
   robot_left_ip:=192.168.71.37 robot_right_ip:=192.168.71.36 \
-  enable_left:=true enable_right:=true motion_scale:=0.30 \
+  enable_left:=true enable_right:=true motion_scale:=0.40 \
   use_rpy_ctrl:=false enable_y_limit:=true
 ```
 

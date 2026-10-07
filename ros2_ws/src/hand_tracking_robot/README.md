@@ -173,7 +173,7 @@ sudo ufw allow 9000/udp
 source ros2_ws/install/setup.bash
 ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
   enable_left:=true enable_right:=false \
-  motion_scale:=0.30 smooth_alpha:=0.30
+  motion_scale:=0.40 smooth_alpha:=0.45
 ```
 
 再启动 JAKA 控制，并显式使用低速限值：
@@ -184,9 +184,9 @@ ros2 launch jaka_driver RC_ctrl.launch.py \
   robot_right_ip:=192.168.71.36 \
   use_rpy_ctrl:=false \
   enable_y_limit:=true \
-  servo_max_tran_step:=0.5 \
-  max_cart_vel:=60.0 \
-  max_cart_acc:=60.0
+  servo_max_tran_step:=0.75 \
+  max_cart_vel:=80.0 \
+  max_cart_acc:=80.0
 ```
 
 观察日志确认左臂依次出现：
@@ -195,7 +195,7 @@ ros2 launch jaka_driver RC_ctrl.launch.py \
 left login OK
 left power_on OK
 left enable_robot OK
-left servo NLF limits: vp=60.0 mm/s ap=60.0 mm/s^2 ...
+left servo NLF limits: vp=80.0 mm/s ap=80.0 mm/s^2 ...
 left servo enabled
 ```
 
@@ -222,7 +222,7 @@ left servo enabled
 # 终端 1：桥接，左右臂都发布目标
 ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
   enable_left:=true enable_right:=true \
-  motion_scale:=0.30 smooth_alpha:=0.30
+  motion_scale:=0.40 smooth_alpha:=0.45
 
 # 终端 2：JAKA 双臂，显式低速
 ros2 launch jaka_driver RC_ctrl.launch.py \
@@ -230,9 +230,9 @@ ros2 launch jaka_driver RC_ctrl.launch.py \
   robot_right_ip:=192.168.71.36 \
   use_rpy_ctrl:=false \
   enable_y_limit:=true \
-  servo_max_tran_step:=0.5 \
-  max_cart_vel:=60.0 \
-  max_cart_acc:=60.0
+  servo_max_tran_step:=0.75 \
+  max_cart_vel:=80.0 \
+  max_cart_acc:=80.0
 ```
 
 也可以一键启动：
@@ -243,12 +243,12 @@ ros2 launch hand_tracking_robot dual_arm_hand_teleop.launch.py \
   robot_left_ip:=192.168.71.37 \
   robot_right_ip:=192.168.71.36 \
   enable_left:=true enable_right:=true \
-  motion_scale:=0.30 smooth_alpha:=0.30 \
+  motion_scale:=0.40 smooth_alpha:=0.45 \
   use_rpy_ctrl:=false \
   enable_y_limit:=true \
-  servo_max_tran_step:=0.5 \
-  max_cart_vel:=60.0 \
-  max_cart_acc:=60.0
+  servo_max_tran_step:=0.75 \
+  max_cart_vel:=80.0 \
+  max_cart_acc:=80.0
 ```
 
 确认 `left_pinch` / `right_pinch` 分别只在自己捏合时变为 `1`，且双臂不会越过中线。
@@ -270,11 +270,11 @@ ros2 launch hand_tracking_robot dual_arm_hand_teleop.launch.py \
 | `port` | `9000` | 监听端口 |
 | `publish_rate` | `100.0` | 发布频率 Hz |
 | `position_source` | `wrist` | `wrist` / `index_tip` / `pinch_midpoint` |
-| `motion_scale` | `0.30` | 手部位移到机械臂位移的比例，第一次真机保持低速 |
+| `motion_scale` | `0.40` | 手部位移到机械臂位移的比例，第一次真机保持低速 |
 | `pinch_threshold` | `0.035` | 捏合判定距离（米） |
 | `pinch_release_ratio` | `1.5` | 松开滞回倍数 |
 | `tracking_timeout` | `1.0` | 多久无数据判定丢失（秒） |
-| `smooth_alpha` | `0.30` | 一阶低通系数，0 关闭 |
+| `smooth_alpha` | `0.45` | 一阶低通系数，0 关闭 |
 | `tf_translation` | `[0,0,0]` | Quest 原点在机器人基座下位置 |
 | `tf_rotation` | `[1,0,0,0]` | Quest 原点在机器人基座下姿态 `[w,x,y,z]` |
 | `unity_to_robot` | `[0.0, 0.0, -1.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0]` | Unity 左手系到 ROS 右手系 3x3 映射 |
@@ -284,13 +284,13 @@ ros2 launch hand_tracking_robot dual_arm_hand_teleop.launch.py \
 
 | 参数 | 默认值 | 说明 |
 | --- | --- | --- |
-| `servo_tran_deadband` | `0.5` | 平移死区 mm，过滤手抖 |
+| `servo_tran_deadband` | `0.25` | 平移死区 mm，过滤手抖 |
 | `servo_rot_deadband` | `0.005` | 姿态死区 rad |
-| `servo_max_tran_step` | `0.5` | 每个 `servo_p` 周期最大平移增量 mm |
+| `servo_max_tran_step` | `0.75` | 每个 `servo_p` 周期最大平移增量 mm |
 | `servo_max_rot_step` | `0.005` | 每个 `servo_p` 周期最大姿态增量 rad |
-| `max_cart_vel` | `60.0` | 笛卡尔速度上限 mm/s |
-| `max_cart_acc` | `60.0` | 笛卡尔加速度上限 mm/s² |
-| `max_cart_jerk` | `120.0` | 笛卡尔加加速度上限 mm/s³ |
+| `max_cart_vel` | `80.0` | 笛卡尔速度上限 mm/s |
+| `max_cart_acc` | `80.0` | 笛卡尔加速度上限 mm/s² |
+| `max_cart_jerk` | `160.0` | 笛卡尔加加速度上限 mm/s³ |
 | `max_rot_vel` | `20.0` | 姿态速度上限 deg/s |
 | `max_rot_acc` | `40.0` | 姿态加速度上限 deg/s² |
 | `max_rot_jerk` | `80.0` | 姿态加加速度上限 deg/s³ |
@@ -299,9 +299,9 @@ ros2 launch hand_tracking_robot dual_arm_hand_teleop.launch.py \
 
 - `rc_ctrl_node` 启动成功后会**自动登录、上电、使能并进入伺服模式**；启动前必须确保
   机械臂工作范围内无人、无障碍。
-- 第一次真机测试必须从 `motion_scale:=0.3` 开始，逐级确认方向后再增大。
-- 代码默认已经把机械臂速度限制为 `60 mm/s`、加速度限制为 `60 mm/s²`，同时每次
-  `servo_p` 平移增量不超过 `0.5 mm`；单臂测试通过前不要调大这些值。
+- 第一次真机测试必须从 `motion_scale:=0.4` 开始，逐级确认方向后再增大。
+- 代码默认已经把机械臂速度限制为 `80 mm/s`、加速度限制为 `80 mm/s²`，同时每次
+  `servo_p` 平移增量不超过 `0.75 mm`；单臂测试通过前不要调大这些值。
 - 默认 `enable_y_limit:=true` 只防止双臂越过中线，不能替代安全围栏、碰撞检测和急停。
 - 松开捏合只会停止随动；若需要完全退出伺服/下电，请关闭 `rc_ctrl_node` 进程并
   使用机械臂示教器确认状态。
