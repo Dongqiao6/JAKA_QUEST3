@@ -38,13 +38,20 @@ hand-tracking-streamer-main/
 
 - Ubuntu 22.04 + ROS 2 Humble。
 - Python `numpy` 与 `pytest`。
-- JAKA SDK 动态库 `libjakaAPI.so`（需自行放入 `jaka_driver/sdk_lib/`）。
+- JAKA SDK 动态库 `libjakaAPI.so`（JAKA 官方闭源库，需自行放入
+  `jaka_driver/sdk_lib/`，见 `jaka_driver/sdk_lib/README.md`）。
 - Quest 3 已安装 HTS（`hand_tracking_streamer.apk`），并与 Ubuntu 主机有线网络连通
   （实际使用 UDP 有线稳定通信）。
 
 ## 首次编译
 
-先把 JAKA SDK 动态库放到指定位置：
+先把 JAKA SDK 动态库放到指定位置。如果手头没有，先在 JAKA 主机上查找：
+
+```bash
+find /usr /opt /home -name 'libjakaAPI.so*' 2>/dev/null
+```
+
+找到后复制到目标位置：
 
 ```bash
 # 把 JAKA 官方提供的 libjakaAPI.so 复制进来
