@@ -87,8 +87,8 @@ class HandTrackingBridge(Node):
 
         # --- Processing parameters ----------------------------------------
         self.publish_rate = float(self.declare_parameter("publish_rate", 100.0).value)
-        self.smooth_alpha = float(self.declare_parameter("smooth_alpha", 0.45).value)
-        self.motion_scale = float(self.declare_parameter("motion_scale", 1.0).value)
+        self.smooth_alpha = float(self.declare_parameter("smooth_alpha", 0.30).value)
+        self.motion_scale = float(self.declare_parameter("motion_scale", 0.30).value)
         self.pinch_threshold = float(self.declare_parameter("pinch_threshold", 0.035).value)
         self.pinch_release_ratio = float(
             self.declare_parameter("pinch_release_ratio", 1.5).value

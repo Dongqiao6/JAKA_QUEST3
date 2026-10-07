@@ -41,8 +41,8 @@ def generate_launch_description():
         'gripper_force', default_value='20',
         description='PGI force percentage (20..100)')
     gripper_speed_arg = DeclareLaunchArgument(
-        'gripper_speed', default_value='100',
-        description='PGI speed percentage (1..100)')
+        'gripper_speed', default_value='40',
+        description='PGI speed percentage (1..100), kept low for first tests')
     gripper_baudrate_arg = DeclareLaunchArgument(
         'gripper_baudrate', default_value='115200',
         description='PGI RS485 baud rate (default 115200)')
@@ -94,6 +94,36 @@ def generate_launch_description():
     enable_y_limit_arg = DeclareLaunchArgument(
         'enable_y_limit', default_value='true',
         description='true = clamp arm TCP y (left > -110 mm, right < 110 mm)')
+    servo_tran_deadband_arg = DeclareLaunchArgument(
+        'servo_tran_deadband', default_value='0.5',
+        description='Translation deadband in mm (ignore smaller handle deltas)')
+    servo_rot_deadband_arg = DeclareLaunchArgument(
+        'servo_rot_deadband', default_value='0.005',
+        description='Orientation deadband in rad (ignore smaller handle deltas)')
+    servo_max_tran_step_arg = DeclareLaunchArgument(
+        'servo_max_tran_step', default_value='0.5',
+        description='Max translation increment per servo_p cycle in mm')
+    servo_max_rot_step_arg = DeclareLaunchArgument(
+        'servo_max_rot_step', default_value='0.005',
+        description='Max orientation increment per servo_p cycle in rad')
+    max_cart_vel_arg = DeclareLaunchArgument(
+        'max_cart_vel', default_value='60.0',
+        description='Cartesian servo speed limit in mm/s')
+    max_cart_acc_arg = DeclareLaunchArgument(
+        'max_cart_acc', default_value='60.0',
+        description='Cartesian servo acceleration limit in mm/s^2')
+    max_cart_jerk_arg = DeclareLaunchArgument(
+        'max_cart_jerk', default_value='120.0',
+        description='Cartesian servo jerk limit in mm/s^3')
+    max_rot_vel_arg = DeclareLaunchArgument(
+        'max_rot_vel', default_value='20.0',
+        description='Orientation servo speed limit in deg/s')
+    max_rot_acc_arg = DeclareLaunchArgument(
+        'max_rot_acc', default_value='40.0',
+        description='Orientation servo acceleration limit in deg/s^2')
+    max_rot_jerk_arg = DeclareLaunchArgument(
+        'max_rot_jerk', default_value='80.0',
+        description='Orientation servo jerk limit in deg/s^3')
 
     # One process per arm: the JAKA SDK holds a single global connection per
     # process, so each rc_ctrl_node instance drives exactly one robot. Two
@@ -131,6 +161,16 @@ def generate_launch_description():
             'gripper_button_index': ParameterValue(LaunchConfiguration('gripper_button_index'), value_type=int),
             'use_rpy_ctrl': ParameterValue(LaunchConfiguration('use_rpy_ctrl'), value_type=bool),
             'enable_y_limit': ParameterValue(LaunchConfiguration('enable_y_limit'), value_type=bool),
+            'servo_tran_deadband_mm': ParameterValue(LaunchConfiguration('servo_tran_deadband'), value_type=float),
+            'servo_rot_deadband_rad': ParameterValue(LaunchConfiguration('servo_rot_deadband'), value_type=float),
+            'servo_max_tran_step_mm': ParameterValue(LaunchConfiguration('servo_max_tran_step'), value_type=float),
+            'servo_max_rot_step_rad': ParameterValue(LaunchConfiguration('servo_max_rot_step'), value_type=float),
+            'max_cart_vel_mm_s': ParameterValue(LaunchConfiguration('max_cart_vel'), value_type=float),
+            'max_cart_acc_mm_s2': ParameterValue(LaunchConfiguration('max_cart_acc'), value_type=float),
+            'max_cart_jerk_mm_s3': ParameterValue(LaunchConfiguration('max_cart_jerk'), value_type=float),
+            'max_rot_vel_deg_s': ParameterValue(LaunchConfiguration('max_rot_vel'), value_type=float),
+            'max_rot_acc_deg_s2': ParameterValue(LaunchConfiguration('max_rot_acc'), value_type=float),
+            'max_rot_jerk_deg_s3': ParameterValue(LaunchConfiguration('max_rot_jerk'), value_type=float),
         }]
     )
     rc_ctrl_right_node = Node(
@@ -165,6 +205,16 @@ def generate_launch_description():
             'gripper_button_index': ParameterValue(LaunchConfiguration('gripper_button_index'), value_type=int),
             'use_rpy_ctrl': ParameterValue(LaunchConfiguration('use_rpy_ctrl'), value_type=bool),
             'enable_y_limit': ParameterValue(LaunchConfiguration('enable_y_limit'), value_type=bool),
+            'servo_tran_deadband_mm': ParameterValue(LaunchConfiguration('servo_tran_deadband'), value_type=float),
+            'servo_rot_deadband_rad': ParameterValue(LaunchConfiguration('servo_rot_deadband'), value_type=float),
+            'servo_max_tran_step_mm': ParameterValue(LaunchConfiguration('servo_max_tran_step'), value_type=float),
+            'servo_max_rot_step_rad': ParameterValue(LaunchConfiguration('servo_max_rot_step'), value_type=float),
+            'max_cart_vel_mm_s': ParameterValue(LaunchConfiguration('max_cart_vel'), value_type=float),
+            'max_cart_acc_mm_s2': ParameterValue(LaunchConfiguration('max_cart_acc'), value_type=float),
+            'max_cart_jerk_mm_s3': ParameterValue(LaunchConfiguration('max_cart_jerk'), value_type=float),
+            'max_rot_vel_deg_s': ParameterValue(LaunchConfiguration('max_rot_vel'), value_type=float),
+            'max_rot_acc_deg_s2': ParameterValue(LaunchConfiguration('max_rot_acc'), value_type=float),
+            'max_rot_jerk_deg_s3': ParameterValue(LaunchConfiguration('max_rot_jerk'), value_type=float),
         }]
     )
 
@@ -194,6 +244,16 @@ def generate_launch_description():
         gripper_button_index_arg,
         use_rpy_ctrl_arg,
         enable_y_limit_arg,
+        servo_tran_deadband_arg,
+        servo_rot_deadband_arg,
+        servo_max_tran_step_arg,
+        servo_max_rot_step_arg,
+        max_cart_vel_arg,
+        max_cart_acc_arg,
+        max_cart_jerk_arg,
+        max_rot_vel_arg,
+        max_rot_acc_arg,
+        max_rot_jerk_arg,
         rc_ctrl_left_node,
         rc_ctrl_right_node,
         LogInfo(msg="RC control nodes launched.")

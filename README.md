@@ -94,6 +94,13 @@ Alternatively, you can build from source by loading `hand_tracking_streamer` pro
 >[!NOTE]
 >Before direct upload, make sure your device is set to [developer mode](https://developers.meta.com/horizon/documentation/native/android/mobile-device-setup/), and allow USB connection. This app is built and tested on Unity 6000.0.65f1
 
+### JAKA 双臂遥操作
+
+如果你要用 Quest 3 手部骨骼点控制 JAKA 双臂，先安装本目录下的
+`hand_tracking_streamer.apk`，但 **HTS App 应在 Ubuntu 端监听、机械臂安全流程准备好后
+再打开并开始传输**。完整的 ROS 2 编译、低速参数、单左臂 → 单右臂 → 双臂测试顺序和
+遥操作映射见 [`ros2_ws/README.md`](ros2_ws/README.md)。
+
 ## Data Streaming
 
 See [CONNECTIONS](CONNECTIONS.md) page for detailed documentation on connections and data format. 

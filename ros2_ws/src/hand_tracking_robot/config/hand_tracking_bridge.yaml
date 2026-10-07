@@ -4,8 +4,8 @@ hand_tracking_bridge:
     host: 0.0.0.0
     port: 9000
     publish_rate: 100.0
-    smooth_alpha: 0.45
-    motion_scale: 1.0
+    smooth_alpha: 0.30
+    motion_scale: 0.30
     pinch_threshold: 0.035
     pinch_release_ratio: 1.5
     tracking_timeout: 1.0

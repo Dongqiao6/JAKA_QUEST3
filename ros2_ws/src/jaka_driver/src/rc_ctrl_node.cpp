@@ -132,12 +132,22 @@ void pose_to_ctrl(const geometry_msgs::msg::PoseStamped &msg,
 }
 
 // Per-cycle Cartesian servo limits. servo_p is fed one increment per 8 ms
-// interpolation cycle, so SERVO_MAX_TRAN_STEP / 0.008 ~= 125 mm/s and
-// SERVO_MAX_ROT_STEP / 0.008 ~= 36 deg/s.
-constexpr double SERVO_TRAN_DEADBAND = 0.5;   // mm: ignore smaller translation deltas
-constexpr double SERVO_ROT_DEADBAND = 0.005;  // rad (~0.29 deg): ignore smaller rotation deltas
-constexpr double SERVO_MAX_TRAN_STEP = 5.0;   // mm per cycle (~125 mm/s)
-constexpr double SERVO_MAX_ROT_STEP = 0.05;  // rad per cycle (~36 deg/s)
+// interpolation cycle, so the maximum commanded velocity is:
+//   translation: servo_max_tran_step_mm / 0.008 s
+//   rotation:    servo_max_rot_step_rad / 0.008 s
+// These software clamps are kept intentionally low. The JAKA controller's
+// non-linear filter (servo_move_use_carte_NLF) is configured in bring_up_arm()
+// and provides a second, harder bound on velocity/acceleration/jerk.
+double servo_tran_deadband = 0.5;    // mm: ignore smaller translation deltas
+double servo_rot_deadband = 0.005;   // rad (~0.29 deg): ignore smaller rotation deltas
+double servo_max_tran_step = 0.5;    // mm per cycle -> ~62.5 mm/s before NLF
+double servo_max_rot_step = 0.005;   // rad per cycle -> ~35.8 deg/s before NLF
+double max_cart_vel_mm_s = 60.0;     // Cartesian speed limit (mm/s)
+double max_cart_acc_mm_s2 = 60.0;    // Cartesian acceleration limit (mm/s^2)
+double max_cart_jerk_mm_s3 = 120.0;  // Cartesian jerk limit (mm/s^3)
+double max_rot_vel_deg_s = 20.0;     // orientation speed limit (deg/s)
+double max_rot_acc_deg_s2 = 40.0;    // orientation acceleration limit (deg/s^2)
+double max_rot_jerk_deg_s3 = 80.0;   // orientation jerk limit (deg/s^3)
 constexpr double Y_LIMIT_MM = 110.0;         // workspace y boundary: left > -110, right < +110
 
 // Drive one arm to track the controller's displacement since grip press, in
@@ -208,9 +218,9 @@ void servo_cartesian(JAKAZuRobot &robot,
 
         max_rot = std::max(std::fabs(incr.rpy.rx),
                  std::max(std::fabs(incr.rpy.ry), std::fabs(incr.rpy.rz)));
-        if (max_rot > SERVO_MAX_ROT_STEP)
+        if (max_rot > servo_max_rot_step)
         {
-            double s = SERVO_MAX_ROT_STEP / max_rot;
+            double s = servo_max_rot_step / max_rot;
             incr.rpy.rx *= s;
             incr.rpy.ry *= s;
             incr.rpy.rz *= s;
@@ -223,15 +233,15 @@ void servo_cartesian(JAKAZuRobot &robot,
     // Deadband: hold in place instead of chasing sub-mm / sub-degree handle noise.
     double max_tran = std::max(std::fabs(incr.tran.x),
                       std::max(std::fabs(incr.tran.y), std::fabs(incr.tran.z)));
-    if (max_tran < SERVO_TRAN_DEADBAND && (!use_rpy_ctrl || max_rot < SERVO_ROT_DEADBAND))
+    if (max_tran < servo_tran_deadband && (!use_rpy_ctrl || max_rot < servo_rot_deadband))
         return;
 
     // Velocity clamp: scale translation to its per-cycle cap, preserving
     // direction. A fast handle swing moves the arm at the capped speed instead
     // of commanding an overspeed Cartesian move.
-    if (max_tran > SERVO_MAX_TRAN_STEP)
+    if (max_tran > servo_max_tran_step)
     {
-        double s = SERVO_MAX_TRAN_STEP / max_tran;
+        double s = servo_max_tran_step / max_tran;
         incr.tran.x *= s;
         incr.tran.y *= s;
         incr.tran.z *= s;
@@ -360,6 +370,20 @@ bool ensure_arm_ready(JAKAZuRobot &robot)
         }
         RCLCPP_INFO(rclcpp::get_logger("rc_ctrl"), "[%s] re-arm enable_robot OK", arm_name.c_str());
         std::this_thread::sleep_for(std::chrono::seconds(4));
+    }
+
+    // Re-apply the conservative Cartesian NLF limits before re-entering servo:
+    // power_on/enable may have reset the filter settings.
+    int nlf_ret = robot.servo_move_use_carte_NLF(
+        max_cart_vel_mm_s, max_cart_acc_mm_s2, max_cart_jerk_mm_s3,
+        max_rot_vel_deg_s, max_rot_acc_deg_s2, max_rot_jerk_deg_s3);
+    if (nlf_ret != 0)
+    {
+        RCLCPP_WARN(rclcpp::get_logger("rc_ctrl"),
+                    "[%s] re-arm servo_move_use_carte_NLF FAILED (ret=%d: %s)",
+                    arm_name.c_str(), nlf_ret,
+                    mapErr.count(nlf_ret) ? mapErr[nlf_ret].c_str() : "unknown");
+        return false;
     }
 
     int ret = robot.servo_move_enable(true);
@@ -590,16 +614,24 @@ bool bring_up_arm(JAKAZuRobot &robot, const std::string &ip, const char *arm)
 
     // Hard Cartesian velocity/acceleration/jerk limits for servo_p (mm/s,
     // mm/s^2, mm/s^3) plus orientation limits (deg/s, deg/s^2, deg/s^3):
-    // a safety bound on top of the per-cycle software clamp.
+    // a safety bound on top of the per-cycle software clamp. These defaults are
+    // deliberately low; increase them only after dry, single-arm testing.
+    RCLCPP_INFO(rclcpp::get_logger("rc_ctrl"),
+                "[%s] servo NLF limits: vp=%.1f mm/s ap=%.1f mm/s^2 jp=%.1f mm/s^3 "
+                "vr=%.1f deg/s ar=%.1f deg/s^2 jr=%.1f deg/s^3",
+                arm_name.c_str(), max_cart_vel_mm_s, max_cart_acc_mm_s2,
+                max_cart_jerk_mm_s3, max_rot_vel_deg_s, max_rot_acc_deg_s2,
+                max_rot_jerk_deg_s3);
 
-    //滤波设置
     //非线性滤波
-    ret = robot.servo_move_use_carte_NLF(1500.0, 2500.0, 2800.0,1120.0, 1180.0, 1720.0);
+    ret = robot.servo_move_use_carte_NLF(
+        max_cart_vel_mm_s, max_cart_acc_mm_s2, max_cart_jerk_mm_s3,
+        max_rot_vel_deg_s, max_rot_acc_deg_s2, max_rot_jerk_deg_s3);
     //速度前瞻滤波
     //ret = robot.servo_speed_foresight(10, 0.5);
     if(ret != 0)
     {
-        RCLCPP_WARN(rclcpp::get_logger("rc_ctrl"), "%s servo_speed_foresight FAILED (ret=%d: %s)",
+        RCLCPP_WARN(rclcpp::get_logger("rc_ctrl"), "%s servo_move_use_carte_NLF FAILED (ret=%d: %s)",
                     arm, ret, mapErr.count(ret) ? mapErr[ret].c_str() : "unknown");
         return false;
     }
@@ -667,7 +699,7 @@ int main(int argc, char *argv[])
     gripper_config.slave_id = node->declare_parameter<int>("gripper_slave_id", 1);
     gripper_config.baudrate = node->declare_parameter<int>("gripper_baudrate", 115200);
     gripper_config.force_percent = node->declare_parameter<int>("gripper_force", 20);
-    gripper_config.speed_percent = node->declare_parameter<int>("gripper_speed", 100);
+    gripper_config.speed_percent = node->declare_parameter<int>("gripper_speed", 40);
     gripper_config.open_position = node->declare_parameter<int>("gripper_open_position", 1000);
     gripper_config.closed_position = node->declare_parameter<int>(
         "gripper_closed_position", 0);
@@ -687,6 +719,16 @@ int main(int argc, char *argv[])
    debug = node->declare_parameter<bool>("debug", false);
    use_rpy_ctrl = node->declare_parameter<bool>("use_rpy_ctrl", false);
    enable_y_limit = node->declare_parameter<bool>("enable_y_limit", true);
+   servo_tran_deadband = node->declare_parameter<double>("servo_tran_deadband_mm", 0.5);
+   servo_rot_deadband = node->declare_parameter<double>("servo_rot_deadband_rad", 0.005);
+   servo_max_tran_step = node->declare_parameter<double>("servo_max_tran_step_mm", 0.5);
+   servo_max_rot_step = node->declare_parameter<double>("servo_max_rot_step_rad", 0.005);
+   max_cart_vel_mm_s = node->declare_parameter<double>("max_cart_vel_mm_s", 60.0);
+   max_cart_acc_mm_s2 = node->declare_parameter<double>("max_cart_acc_mm_s2", 60.0);
+   max_cart_jerk_mm_s3 = node->declare_parameter<double>("max_cart_jerk_mm_s3", 120.0);
+   max_rot_vel_deg_s = node->declare_parameter<double>("max_rot_vel_deg_s", 20.0);
+   max_rot_acc_deg_s2 = node->declare_parameter<double>("max_rot_acc_deg_s2", 40.0);
+   max_rot_jerk_deg_s3 = node->declare_parameter<double>("max_rot_jerk_deg_s3", 80.0);
 
 
     gripper = std::make_unique<pgi140::Pgi140Gripper>(robot, gripper_config);
