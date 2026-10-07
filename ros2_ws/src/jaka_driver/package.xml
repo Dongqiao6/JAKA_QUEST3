@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>jaka_driver</name>
+  <version>0.0.0</version>
+  <description>The jaka_driver package (HTS teleop rc_ctrl_node)</description>
+
+  <maintainer email="meddy@todo.todo">meddy</maintainer>
+  <license>TODO</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <build_depend>rclcpp</build_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>jaka_msgs</build_depend>
+
+  <build_export_depend>rclcpp</build_export_depend>
+  <build_export_depend>geometry_msgs</build_export_depend>
+  <build_export_depend>sensor_msgs</build_export_depend>
+  <build_export_depend>jaka_msgs</build_export_depend>
+
+  <exec_depend>rclcpp</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>jaka_msgs</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

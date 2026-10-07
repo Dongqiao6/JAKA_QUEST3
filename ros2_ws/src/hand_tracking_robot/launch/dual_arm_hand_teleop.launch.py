@@ -1,7 +1,7 @@
 """Convenience launch: HTS bridge + JAKA dual-arm rc_ctrl in one command.
 
-Requires both ``hand_tracking_robot`` and ``jaka_driver`` to be available on the
-ROS package path (source both workspace install/setup.bash files first).
+``hand_tracking_robot`` and ``jaka_driver`` are both part of this workspace, so
+only ``source install/setup.bash`` is required before running this file.
 """
 
 from launch import LaunchDescription

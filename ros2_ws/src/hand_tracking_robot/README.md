@@ -3,31 +3,65 @@
 把 Meta Quest 3 的 **视觉手部骨骼点**（Hand Tracking Streamer，HTS）转换成 JAKA
 双臂机械臂的笛卡尔伺服目标。
 
-本项目只新增在 `hand-tracking-streamer-main` 内，复用了
-`Jaka_VR-main` 中已经验证过的 `rc_ctrl_node`：Quest 侧只负责发手部骨骼数据，
-Ubuntu 侧由本包解析并发布 `PoseStamped` / `Joy`，`rc_ctrl_node` 负责真正登录、
-上电、使能机械臂并调用 JAKA SDK 的 `servo_p`。
+本项目已把遥操作所需的 ROS 2 包整合到同一个交付文件夹中，不再依赖外部的
+`Jaka_VR-main`：
 
-## 目录结构
+- `hand_tracking_robot`：UDP 接收 HTS 数据，解析手部骨骼并发布
+  `PoseStamped` / `Joy`。
+- `jaka_driver`：复用 JAKA 已验证的 `rc_ctrl_node`，负责登录、上电、使能机械臂
+  并调用 JAKA SDK 的 `servo_p`。
+- `jaka_msgs`：`rc_ctrl_node` 需要的 ROS 2 消息/服务定义。
+
+## 交付目录
 
 ```text
-hand-tracking-streamer-main/ros2_ws/src/hand_tracking_robot/
-├── hand_tracking_robot/
-│   ├── __init__.py
-│   ├── hts_parser.py              # HTS 数据解析、四元数/坐标变换
-│   └── hand_tracking_bridge_node.py  # ROS2 节点：UDP 接收 -> PoseStamped/Joy
-├── launch/
-│   ├── hand_tracking_bridge.launch.py        # 只启动桥接节点
-│   └── dual_arm_hand_teleop.launch.py        # 桥接 + JAKA 双臂 rc_ctrl
-├── config/
-│   └── hand_tracking_bridge.yaml             # 参数示例
-├── test/
-│   ├── fake_hand_stream.py                   # 无 Quest 时的假数据发送器
-│   └── test_hts_parser.py                    # 解析器单元测试
-├── package.xml
-├── setup.py
-└── setup.cfg
+hand-tracking-streamer-main/
+├── hand_tracking_streamer.apk          # Quest 3 安装包
+├── hand_tracking_streamer/             # Unity 工程（如不需要可只交付 APK）
+└── ros2_ws/
+    ├── README.md
+    └── src/
+        ├── hand_tracking_robot/        # HTS 桥接节点
+        │   ├── hand_tracking_robot/
+        │   ├── launch/
+        │   ├── config/
+        │   └── test/
+        ├── jaka_driver/                # rc_ctrl_node + PGI 夹爪
+        │   ├── include/                # JAKA SDK 头文件
+        │   ├── launch/
+        │   ├── sdk_lib/                # 放 libjakaAPI.so（需手动补齐）
+        │   └── src/
+        └── jaka_msgs/                  # JAKA 消息/服务
 ```
+
+## 环境要求
+
+- Ubuntu 22.04 + ROS 2 Humble。
+- Python `numpy` 与 `pytest`。
+- JAKA SDK 动态库 `libjakaAPI.so`（需自行放入 `jaka_driver/sdk_lib/`）。
+- Quest 3 已安装 HTS（`hand_tracking_streamer.apk`），并与 Ubuntu 主机有线网络连通
+  （实际使用 UDP 有线稳定通信）。
+
+## 首次编译
+
+先把 JAKA SDK 动态库放到指定位置：
+
+```bash
+# 把 JAKA 官方提供的 libjakaAPI.so 复制进来
+cp /path/to/libjakaAPI.so \
+  ros2_ws/src/jaka_driver/sdk_lib/libjakaAPI.so
+```
+
+然后编译整个工作空间：
+
+```bash
+cd ros2_ws
+colcon build --symlink-install
+source install/setup.bash
+```
+
+没有 `libjakaAPI.so` 时也可以编译：`jaka_driver` 只安装 launch 文件、不生成
+`rc_ctrl_node`，因此可以先完成桥接节点测试；要控制机械臂前必须补上 SDK 并重新编译。
 
 ## 原理
 
@@ -42,48 +76,79 @@ HTS 每个 UDP 报文里包含两类行：
 2. 用腕部位姿（也可配置成食指指尖/捏合中点）作为机械臂末端目标点。
 3. 用 **拇指尖-食指尖距离** 判断是否“捏合”。捏合相当于 JAKA 遥控里的“按住侧键”，
    机械臂进入随动；松开即保持原位。
-4. 把 Unity 左手系坐标映射到 JAKA/ROS 右手系，默认与
-   `Jaka_VR-main/src/quest_vr/quest_reader.py` 一致：`(x,y,z) -> (-z,-x,y)`。
+4. 把 Unity 左手系坐标映射到 JAKA/ROS 右手系，默认 `(x,y,z) -> (-z,-x,y)`。
 5. 以 `100 Hz` 发布：
    - `geometry_msgs/PoseStamped` 到 `/rc_ctrl/left_target`、`/rc_ctrl/right_target`
    - `sensor_msgs/Joy` 到 `/rc_ctrl/button`（`axes[0]` 左手捏合、`axes[1]` 右手捏合）
 
-JAKA 侧沿用现有 `rc_ctrl_node`：捏合上升沿记录机械臂当前位置为原点，之后按手柄/手部
-位移做增量笛卡尔伺服；松手后停止。默认 `use_rpy_ctrl=false`，只做三维平移。
+JAKA 侧由 `rc_ctrl_node` 处理：捏合上升沿记录机械臂当前位置为原点，之后按手部位移
+做增量笛卡尔伺服；松手后停止。默认 `use_rpy_ctrl=false`，只做三维平移。
 
-## 环境要求
+## 安全测试流程
 
-- Ubuntu 22.04 + ROS 2 Humble。
-- 已按 `Jaka_VR-main/Readme.md` 编译并安装 `jaka_driver`、`jaka_msgs` 等包。
-- Python `numpy`。
-- Quest 3 已安装 HTS（`hand_tracking_streamer.apk`），并与 Ubuntu 主机有线网络
-  连通（本工程实际使用 UDP 有线稳定通信）。
+### 第 0 步：先测试代码，不接机械臂
 
-## 编译
+在没有 Quest、没有机械臂时，先验证解析、话题、参数和 UDP 链路。
 
 ```bash
-cd /home/carrie/my_project/hand-tracking-streamer-main/ros2_ws
-colcon build --symlink-install
+cd ros2_ws
 source install/setup.bash
 
-# 再 source JAKA 工作空间（按你的实际路径）
-source /home/carrie/my_project/Jaka_VR-main/install/setup.bash
+# 1. 单元测试（无 ROS 节点，也不会让机械臂运动）
+python3 -m pytest src/hand_tracking_robot/test/test_hts_parser.py
 ```
 
-> 两个工作空间都要 source；本包的 `dual_arm_hand_teleop.launch.py` 需要找到
-> `jaka_driver` 的 launch 文件。若没有编译过 JAKA 工作空间，先按
-> `Jaka_VR-main/Readme.md` 编译。
-
-## 运行
-
-### 方式一：只启动桥接节点（推荐先测试）
+启动桥接节点：
 
 ```bash
 ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py
 ```
 
-然后在另一个终端启动 JAKA 双臂控制（IP 参考 Jaka_VR-main，默认左 `192.168.71.37`、
-右 `192.168.71.36`）：
+在第二个终端运行假数据发送器：
+
+```bash
+cd ros2_ws
+source install/setup.bash
+python3 src/hand_tracking_robot/test/fake_hand_stream.py \
+  --host 127.0.0.1 --port 9000 --pinch --both-hands
+```
+
+第三个终端检查输出：
+
+```bash
+source ros2_ws/install/setup.bash
+ros2 topic echo /rc_ctrl/button
+ros2 topic echo /rc_ctrl/left_target
+ros2 topic echo /rc_ctrl/right_target
+```
+
+确认标准：
+
+- 桥接日志出现 `listening for HTS UDP on 0.0.0.0:9000`。
+- `left_fresh=True`、`right_fresh=True`。
+- `left_pinch` / `right_pinch` 随 `--pinch` 或假数据在 0/1 间变化。
+- 两个目标位姿话题持续发布，且没有异常退出。
+
+这一步完全不启动 `rc_ctrl_node`，不会给机械臂发任何运动指令。
+
+### 第 1 步：单臂低速空载测试
+
+只有第 0 步全部通过后再进行这一步。开始前必须满足：
+
+- 双臂处于**空载、低速、急停可及**状态，工作范围内无人、无障碍物。
+- 已把 `libjakaAPI.so` 放入 `sdk_lib/` 并重新编译。
+- 一个人负责操作，另一个人随时按急停。
+
+先只启动桥接节点，并**关闭右臂输出、降低运动比例**：
+
+```bash
+source ros2_ws/install/setup.bash
+ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
+  enable_right:=false \
+  motion_scale:=0.3
+```
+
+再启动 JAKA 双臂控制（`rc_ctrl` 仍会登录左右臂，但右臂收不到目标位姿）：
 
 ```bash
 ros2 launch jaka_driver RC_ctrl.launch.py \
@@ -93,25 +158,61 @@ ros2 launch jaka_driver RC_ctrl.launch.py \
   enable_y_limit:=true
 ```
 
-### 方式二：一键启动（桥接 + 双臂）
+观察日志确认左臂依次出现：
 
-```bash
-ros2 launch hand_tracking_robot dual_arm_hand_teleop.launch.py \
-  robot_left_ip:=192.168.71.37 \
-  robot_right_ip:=192.168.71.36
+```text
+left login OK
+left power_on OK
+left enable_robot OK
+left servo enabled
 ```
 
-## Quest 3 上的 HTS 设置
+然后用左手做小幅度捏合并缓慢移动，确认方向、比例和急停反应都正确后，再逐步加大
+`motion_scale`。同样方式把 `enable_left:=false`、`enable_right:=true` 测试右臂。
+
+### 第 2 步：Quest 3 真机数据测试
+
+单臂验证通过后，再接入 Quest：
 
 1. 打开 HTS App，网络协议选 **UDP**。
 2. 目标 IP 填 Ubuntu 主机的有线网卡 IP。
-3. 端口填 `9000`（与启动参数一致）。
-4. 手模式选 **Dual/Both**（双臂都控制）。
-5. 建议关闭 Debug Info 避免报文头变化（本包两种格式都能解析，但普通格式更省带宽）。
+3. 端口填 `9000`。
+4. 手模式选 **Dual/Both**。
+5. 建议关闭 Debug Info，减少报文头变化。
 6. 点击开始传输。
 
-> 有线场景下应确认 Quest 与 Ubuntu 在同一网段，且防火墙放行 UDP 9000：
-> `sudo ufw allow 9000/udp`。
+确认 Quest 与 Ubuntu 在同一网段，且防火墙放行 UDP 9000：
+
+```bash
+sudo ufw allow 9000/udp
+```
+
+### 第 3 步：双臂联动测试
+
+一切正常后，用一键启动：
+
+```bash
+source ros2_ws/install/setup.bash
+ros2 launch hand_tracking_robot dual_arm_hand_teleop.launch.py \
+  robot_left_ip:=192.168.71.37 \
+  robot_right_ip:=192.168.71.36 \
+  use_rpy_ctrl:=false \
+  enable_y_limit:=true
+```
+
+也可以分开启动，便于分别查看日志：
+
+```bash
+# 终端 1：桥接
+ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py
+
+# 终端 2：JAKA 双臂
+ros2 launch jaka_driver RC_ctrl.launch.py \
+  robot_left_ip:=192.168.71.37 \
+  robot_right_ip:=192.168.71.36 \
+  use_rpy_ctrl:=false \
+  enable_y_limit:=true
+```
 
 ## 操作方式
 
@@ -119,7 +220,7 @@ ros2 launch hand_tracking_robot dual_arm_hand_teleop.launch.py \
 - 做“捏合”（拇指尖碰食指）**进入控制**，移动手部，机械臂末端做三维平移随动。
 - **松开捏合**，机械臂保持当前位置。
 - 手部丢失跟踪超过 `tracking_timeout` 会自动释放捏合信号，机械臂保持。
-- 想改变手的敏感度：调 `motion_scale`；想更平滑：调大/调小 `smooth_alpha`。
+- 想改变手的敏感度：调 `motion_scale`；想更平滑：调 `smooth_alpha`。
 
 ## 常用参数
 
@@ -139,31 +240,11 @@ ros2 launch hand_tracking_robot dual_arm_hand_teleop.launch.py \
 | `tf_rotation` | `[1,0,0,0]` | Quest 原点在机器人基座下姿态 `[w,x,y,z]` |
 | `unity_to_robot` | `[0.0, 0.0, -1.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0]` | Unity 左手系到 ROS 右手系 3x3 映射 |
 
-例子：手移动 10 cm 只让机械臂移动 5 cm，且捏合更灵敏：
-
-```bash
-ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
-  motion_scale:=0.5 pinch_threshold:=0.05
-```
-
-## 无 Quest 的离线测试
-
-先启动桥接节点，再运行假数据发送器：
-
-```bash
-# 终端 1
-ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py
-
-# 终端 2
-python3 ./test/fake_hand_stream.py \
-  --host 127.0.0.1 --port 9000 --pinch --both-hands
-```
-
-然后可以用 `ros2 topic echo /rc_ctrl/left_target` 查看目标位姿（不启动真机械臂时
-`rc_ctrl_node` 会登录失败，但桥接发布不受影响）。
-
 ## 安全提示
 
-- 第一次测试请让机械臂处于低速、空载、急停可及的状态。
-- 建议先用 `motion_scale:=0.3` 等较小比例验证方向后再逐步增大。
-- 默认 `enable_y_limit:=true` 只防止双臂越中线，不能替代安全围栏和碰撞检测。
+- `rc_ctrl_node` 启动成功后会**自动登录、上电、使能并进入伺服模式**；启动前必须确保
+  机械臂工作范围内无人、无障碍。
+- 第一次真机测试必须从 `motion_scale:=0.3` 开始，逐级确认方向后再增大。
+- 默认 `enable_y_limit:=true` 只防止双臂越过中线，不能替代安全围栏、碰撞检测和急停。
+- 松开捏合只会停止随动；若需要完全退出伺服/下电，请关闭 `rc_ctrl_node` 进程并
+  使用机械臂示教器确认状态。
