@@ -42,6 +42,14 @@ def generate_launch_description():
         'max_rot_acc', default_value='40.0')
     max_rot_jerk_arg = DeclareLaunchArgument(
         'max_rot_jerk', default_value='80.0')
+    servo_filter_mode_arg = DeclareLaunchArgument(
+        'servo_filter_mode', default_value='joint')
+    max_joint_vel_arg = DeclareLaunchArgument(
+        'max_joint_vel', default_value='40.0')
+    max_joint_acc_arg = DeclareLaunchArgument(
+        'max_joint_acc', default_value='80.0')
+    max_joint_jerk_arg = DeclareLaunchArgument(
+        'max_joint_jerk', default_value='160.0')
 
     protocol_arg = DeclareLaunchArgument('protocol', default_value='udp')
     host_arg = DeclareLaunchArgument('host', default_value='0.0.0.0')
@@ -75,6 +83,10 @@ def generate_launch_description():
             'max_rot_vel': LaunchConfiguration('max_rot_vel'),
             'max_rot_acc': LaunchConfiguration('max_rot_acc'),
             'max_rot_jerk': LaunchConfiguration('max_rot_jerk'),
+            'servo_filter_mode': LaunchConfiguration('servo_filter_mode'),
+            'max_joint_vel': LaunchConfiguration('max_joint_vel'),
+            'max_joint_acc': LaunchConfiguration('max_joint_acc'),
+            'max_joint_jerk': LaunchConfiguration('max_joint_jerk'),
         }.items(),
     )
 
@@ -113,6 +125,10 @@ def generate_launch_description():
         max_rot_vel_arg,
         max_rot_acc_arg,
         max_rot_jerk_arg,
+        servo_filter_mode_arg,
+        max_joint_vel_arg,
+        max_joint_acc_arg,
+        max_joint_jerk_arg,
         protocol_arg,
         host_arg,
         port_arg,

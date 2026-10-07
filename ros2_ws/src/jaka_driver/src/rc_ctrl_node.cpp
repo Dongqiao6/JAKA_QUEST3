@@ -136,7 +136,7 @@ void pose_to_ctrl(const geometry_msgs::msg::PoseStamped &msg,
 //   translation: servo_max_tran_step_mm / 0.008 s
 //   rotation:    servo_max_rot_step_rad / 0.008 s
 // These software clamps are kept intentionally low. The JAKA controller's
-// non-linear filter (servo_move_use_carte_NLF) is configured in bring_up_arm()
+// non-linear filter (joint-space by default) is configured in bring_up_arm()
 // and provides a second, harder bound on velocity/acceleration/jerk.
 double servo_tran_deadband = 0.25;   // mm: ignore smaller translation deltas
 double servo_rot_deadband = 0.005;   // rad (~0.29 deg): ignore smaller rotation deltas
@@ -148,6 +148,10 @@ double max_cart_jerk_mm_s3 = 160.0;  // Cartesian jerk limit (mm/s^3)
 double max_rot_vel_deg_s = 20.0;     // orientation speed limit (deg/s)
 double max_rot_acc_deg_s2 = 40.0;    // orientation acceleration limit (deg/s^2)
 double max_rot_jerk_deg_s3 = 80.0;   // orientation jerk limit (deg/s^3)
+std::string servo_filter_mode = "joint"; // "joint" limits joint motion, "cartesian" limits TCP motion
+double max_joint_vel_deg_s = 40.0;   // joint speed limit (deg/s)
+double max_joint_acc_deg_s2 = 80.0;  // joint acceleration limit (deg/s^2)
+double max_joint_jerk_deg_s3 = 160.0;// joint jerk limit (deg/s^3)
 constexpr double Y_LIMIT_MM = 110.0;         // workspace y boundary: left > -110, right < +110
 
 // Drive one arm to track the controller's displacement since grip press, in
@@ -292,6 +296,46 @@ void servo_hold(JAKAZuRobot &robot)
     }
 }
 
+// Apply servo smoothing limits. Joint-space limits are the safer default for
+// hand teleoperation because a small Cartesian TCP move near a singularity can
+// otherwise produce a large, fast joint swing (especially joint 4). Cartesian
+// mode is kept available for users who explicitly want TCP velocity limits.
+bool apply_servo_limits(JAKAZuRobot &robot)
+{
+    int ret = 0;
+    if (servo_filter_mode == "cartesian")
+    {
+        RCLCPP_INFO(rclcpp::get_logger("rc_ctrl"),
+                    "[%s] servo filter=cartesian vp=%.1f mm/s ap=%.1f mm/s^2 jp=%.1f mm/s^3 "
+                    "vr=%.1f deg/s ar=%.1f deg/s^2 jr=%.1f deg/s^3",
+                    arm_name.c_str(), max_cart_vel_mm_s, max_cart_acc_mm_s2,
+                    max_cart_jerk_mm_s3, max_rot_vel_deg_s, max_rot_acc_deg_s2,
+                    max_rot_jerk_deg_s3);
+        ret = robot.servo_move_use_carte_NLF(
+            max_cart_vel_mm_s, max_cart_acc_mm_s2, max_cart_jerk_mm_s3,
+            max_rot_vel_deg_s, max_rot_acc_deg_s2, max_rot_jerk_deg_s3);
+    }
+    else
+    {
+        RCLCPP_INFO(rclcpp::get_logger("rc_ctrl"),
+                    "[%s] servo filter=joint vj=%.1f deg/s aj=%.1f deg/s^2 jj=%.1f deg/s^3",
+                    arm_name.c_str(), max_joint_vel_deg_s,
+                    max_joint_acc_deg_s2, max_joint_jerk_deg_s3);
+        ret = robot.servo_move_use_joint_NLF(
+            max_joint_vel_deg_s, max_joint_acc_deg_s2, max_joint_jerk_deg_s3);
+    }
+
+    if (ret != 0)
+    {
+        RCLCPP_WARN(rclcpp::get_logger("rc_ctrl"),
+                    "[%s] apply_servo_limits FAILED (ret=%d: %s)",
+                    arm_name.c_str(), ret,
+                    mapErr.count(ret) ? mapErr[ret].c_str() : "unknown");
+        return false;
+    }
+    return true;
+}
+
 // Re-arm the robot if protection dropped it out of servo. Called on every grip
 // press so a re-grip recovers from a protective/collision stop. Checks the
 // states top-down (servo -> enable -> power-on) and drives them bottom-up
@@ -372,19 +416,10 @@ bool ensure_arm_ready(JAKAZuRobot &robot)
         std::this_thread::sleep_for(std::chrono::seconds(4));
     }
 
-    // Re-apply the conservative Cartesian NLF limits before re-entering servo:
+    // Re-apply the conservative servo limits before re-entering servo:
     // power_on/enable may have reset the filter settings.
-    int nlf_ret = robot.servo_move_use_carte_NLF(
-        max_cart_vel_mm_s, max_cart_acc_mm_s2, max_cart_jerk_mm_s3,
-        max_rot_vel_deg_s, max_rot_acc_deg_s2, max_rot_jerk_deg_s3);
-    if (nlf_ret != 0)
-    {
-        RCLCPP_WARN(rclcpp::get_logger("rc_ctrl"),
-                    "[%s] re-arm servo_move_use_carte_NLF FAILED (ret=%d: %s)",
-                    arm_name.c_str(), nlf_ret,
-                    mapErr.count(nlf_ret) ? mapErr[nlf_ret].c_str() : "unknown");
+    if (!apply_servo_limits(robot))
         return false;
-    }
 
     int ret = robot.servo_move_enable(true);
     if (ret != 0)
@@ -612,29 +647,11 @@ bool bring_up_arm(JAKAZuRobot &robot, const std::string &ip, const char *arm)
     // (disable) would let the arm push through obstacles — unsafe in VR teleop.
     robot.set_collision_level(3);
 
-    // Hard Cartesian velocity/acceleration/jerk limits for servo_p (mm/s,
-    // mm/s^2, mm/s^3) plus orientation limits (deg/s, deg/s^2, deg/s^3):
-    // a safety bound on top of the per-cycle software clamp. These defaults are
-    // deliberately low; increase them only after dry, single-arm testing.
-    RCLCPP_INFO(rclcpp::get_logger("rc_ctrl"),
-                "[%s] servo NLF limits: vp=%.1f mm/s ap=%.1f mm/s^2 jp=%.1f mm/s^3 "
-                "vr=%.1f deg/s ar=%.1f deg/s^2 jr=%.1f deg/s^3",
-                arm_name.c_str(), max_cart_vel_mm_s, max_cart_acc_mm_s2,
-                max_cart_jerk_mm_s3, max_rot_vel_deg_s, max_rot_acc_deg_s2,
-                max_rot_jerk_deg_s3);
-
-    //非线性滤波
-    ret = robot.servo_move_use_carte_NLF(
-        max_cart_vel_mm_s, max_cart_acc_mm_s2, max_cart_jerk_mm_s3,
-        max_rot_vel_deg_s, max_rot_acc_deg_s2, max_rot_jerk_deg_s3);
-    //速度前瞻滤波
-    //ret = robot.servo_speed_foresight(10, 0.5);
-    if(ret != 0)
-    {
-        RCLCPP_WARN(rclcpp::get_logger("rc_ctrl"), "%s servo_move_use_carte_NLF FAILED (ret=%d: %s)",
-                    arm, ret, mapErr.count(ret) ? mapErr[ret].c_str() : "unknown");
+    // Apply velocity/acceleration/jerk limits. Joint-space filtering is the
+    // default because it prevents a small Cartesian move near a singularity
+    // from turning into a fast joint swing (most visible on joint 4).
+    if (!apply_servo_limits(robot))
         return false;
-    }
 
 
     ret = robot.servo_move_enable(true);
@@ -729,6 +746,17 @@ int main(int argc, char *argv[])
    max_rot_vel_deg_s = node->declare_parameter<double>("max_rot_vel_deg_s", 20.0);
    max_rot_acc_deg_s2 = node->declare_parameter<double>("max_rot_acc_deg_s2", 40.0);
    max_rot_jerk_deg_s3 = node->declare_parameter<double>("max_rot_jerk_deg_s3", 80.0);
+   servo_filter_mode = node->declare_parameter<std::string>("servo_filter_mode", "joint");
+   if (servo_filter_mode != "joint" && servo_filter_mode != "cartesian")
+   {
+       RCLCPP_WARN(rclcpp::get_logger("rc_ctrl"),
+                   "[%s] unknown servo_filter_mode '%s'; falling back to 'joint'",
+                   arm_name.c_str(), servo_filter_mode.c_str());
+       servo_filter_mode = "joint";
+   }
+   max_joint_vel_deg_s = node->declare_parameter<double>("max_joint_vel_deg_s", 40.0);
+   max_joint_acc_deg_s2 = node->declare_parameter<double>("max_joint_acc_deg_s2", 80.0);
+   max_joint_jerk_deg_s3 = node->declare_parameter<double>("max_joint_jerk_deg_s3", 160.0);
 
 
     gripper = std::make_unique<pgi140::Pgi140Gripper>(robot, gripper_config);

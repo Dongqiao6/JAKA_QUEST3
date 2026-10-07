@@ -1,166 +1,393 @@
-<div align="center">
-<img width="1224" height="500" alt="HTS logo" src="https://github.com/user-attachments/assets/7408e771-432e-435f-8f6e-d68656205a37" />
-<h3 align="center">
-    Meta Quest VR App for tracking and streaming hand and wrist landmark telemetry.
-  </h3>
-</div>
-<p align="center">
+# Quest3 手部骨骼点 -> JAKA 双臂遥操作
 
-  <a href="https://www.meta.com/experiences/hand-tracking-streamer/26303946202523164/">
-   <img src="https://img.shields.io/badge/download-Meta_Quest_Store-FF5757?labelColor=grey" alt="Horizon Store Release">
-  </a>
+本工程用 Meta Quest 3 上的 `Hand Tracking Streamer`（HTS）识别手部骨骼点，通过
+UDP 发送到 Ubuntu，再由 ROS 2 把**手部位移**转换成 JAKA 双臂的增量笛卡尔伺服。
 
-  <a href="https://github.com/wengmister/hand-tracking-streamer/blob/main/LICENSE">
-    <img src="https://img.shields.io/badge/license-Apache%20License%202.0-yellow.svg" alt="Apache 2.0">
-  </a>
+默认参数按“先慢后快、先单臂后双臂”配置。实际遥操作链路：
 
-  <a href="https://zenodo.org/records/18601332">
-    <img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.18601332-blue.svg" alt="Zenodo DOI">
-  </a>
-
-  <a href="https://github.com/wengmister/hand-tracking-sdk">
-    <img src="https://img.shields.io/badge/SDK-Python-green?labelColor=grey" alt="Python SDK">
-  </a>
-</p>
-
-**Hand Tracking Streamer** is a lightweight hand telemetry utility that turns a Meta Quest headset into a precision controller for robotics teleoperation and motion capture. Built on the Meta Interaction SDK, it streams 21-landmark hand data and 6-DoF wrist pose to a PC in real time over Wi-Fi using UDP for ultra-low latency or TCP for reliable data logging. The app supports left, right, or dual-hand modes with in-headset configuration, and includes a live log console and phantom hand visualization for debugging. Data is sent as structured packets of joint positions and orientations in Unity world space, making it suitable for robot control, imitation learning, and gesture-based prototyping.
-
-
-### What's New!
-
-<details>
-<summary>Click to expand changelog</summary>
-
-
-v1.1.0:
-
- - Added video streaming from host 
- - Added head tracking frame 
- - Added debug info for frame header and HUD display 
- - Now uses numerical keyboard for IP and Port input 
- - HUD now uses TMP to improve readability
-
-![immersive_sim_sm](https://github.com/user-attachments/assets/f77df332-ad51-4f36-aca7-a646c4a17d73)
-
-
-v1.0.4:
-- Added wireless TCP connection
-  - This performs more consistently than wireless UDP and is not affected by batching
-  - Now gracefully handles TCP connection interruption
-- Enabled menu button to pause and evoke main menu during streaming
-- Added network status indication on main menu
-- Now loads last used connection config automatically on start up
-
-v1.0.3:
-- Added landmark visualization for tracked hands
-
-![visualize_landmark](https://github.com/user-attachments/assets/35656d86-02eb-45ec-bb9b-7b4f4cdd3c83)
-
-- Adjusted panel menu to include visualization toggle
-- Fixed the issue where index of little finger were shifted by one
-
-v1.0.2:
-- Improved panel menu text readability
-- Hand tracking frequency is now set to MAX
-
-v1.0.1:
-- Fixed the issue where sometimes panel menu would spawn on the floor
-- Fixed missing splash screen
-
-v1.0.0:
-- Added in-app menu to allow streaming configurations:
-  - Network protocol
-  - IP Address
-  - Port number
-  - Hand side
-
-- Added full bimanual tracking.
-- Added synthetic hand visualization on tracked hands.
-- Now available on SideQuest.
-
-</details>
-
-
-## Deployment
-
-### AppStore Available
-
-You can download the app from [Meta Quest Store](https://www.meta.com/experiences/hand-tracking-streamer/26303946202523164), or sideload the app with [SideQuest](https://sidequestvr.com/app/46236/hand-tracking-streamer) for free.
-
-### Local Builds
-
-Alternatively, you can build from source by loading `hand_tracking_streamer` project in [Unity](https://unity.com/download) or directly upload `hand_tracking_streamer.apk` via ADB to your device.
-
->[!NOTE]
->Before direct upload, make sure your device is set to [developer mode](https://developers.meta.com/horizon/documentation/native/android/mobile-device-setup/), and allow USB connection. This app is built and tested on Unity 6000.0.65f1
-
-### JAKA 双臂遥操作
-
-如果你要用 Quest 3 手部骨骼点控制 JAKA 双臂，先安装本目录下的
-`hand_tracking_streamer.apk`，但 **HTS App 应在 Ubuntu 端监听、机械臂安全流程准备好后
-再打开并开始传输**。完整的 ROS 2 编译、低速参数、单左臂 → 单右臂 → 双臂测试顺序和
-遥操作映射见 [`ros2_ws/README.md`](ros2_ws/README.md)。
-
-## Data Streaming
-
-See [CONNECTIONS](CONNECTIONS.md) page for detailed documentation on connections and data format. 
-
-### Quick Start
-Not ready to integrate into your system yet? Check out the simple socket and the visualizer script provided under [/scripts](/scripts) for quickly testing data streamed from your device.
-
-<details>
-<summary>Click to see visualizer in action</summary>
-
-Install dependencies, connect HTS, and simply run:
-
-```python
-python ./scripts/visualizer.py --protocol [YOUR PROTOCOL] --host [YOUR HOST IP] --port [YOUR PORT] --show-fingers
+```text
+Quest3 HTS App
+  -> UDP:9000
+  -> hand_tracking_bridge（解析手腕/骨骼点，发布 PoseStamped + Joy）
+  -> rc_ctrl_left / rc_ctrl_right（登录/上电/使能 JAKA，执行 servo_p）
+  -> JAKA 双臂
 ```
-    
-![visualizer](https://github.com/user-attachments/assets/431c994a-9287-4641-acb3-22e96c83b925)
 
-</details>
+## 目录结构
 
-## Python SDK
+```text
+hand-tracking-streamer-main/
+├── hand_tracking_streamer.apk          # Quest3 安装包
+├── run_quest_teleop.sh                 # 自动启动/停止 Quest APK 的遥操作包装脚本
+├── hand_tracking_streamer/             # Unity 工程（如不需要可只交付 APK）
+└── ros2_ws/
+    └── src/
+        ├── hand_tracking_robot/        # HTS 解析、话题发布
+        ├── jaka_driver/                # rc_ctrl_node + PGI 夹爪驱动
+        └── jaka_msgs/                  # JAKA 消息/服务定义
+```
 
-For integrating HTS data into your own pipelines, use the official [Python SDK](https://github.com/wengmister/hand-tracking-sdk). It provides typed data structures, parsers for the HTS packet format, and utilities for real-time visualization and logging, so you can go from streamed packets to usable hand pose data quickly. The package is published on [PyPI](https://pypi.org/project/hand-tracking-sdk/); see the [documentation](https://hand-tracking-sdk.readthedocs.io/en/latest/) for API details and examples.
+## 环境要求
+
+- Ubuntu 22.04 + ROS 2 Humble。
+- Python `numpy`、`pytest`。
+- JAKA SDK 动态库 `libjakaAPI.so`。
+- Quest3 已安装 `hand_tracking_streamer.apk`，并通过 `adb` 可访问。
+
+## 1. Quest3 APK：安装、启动、停止
+
+### 安装
 
 ```bash
-# if using uv
-uv add hand-tracking-sdk
-
-# or install via pip
-pip install hand-tracking-sdk
+adb install hand_tracking_streamer.apk
 ```
 
-## Demo
+### 手动启动 APK
 
-### landmark visualization
-<img src="https://github.com/user-attachments/assets/3686b1bc-07d2-4517-bcc0-bbecb382df78" width="500"><br>
+```bash
+adb shell monkey -p com.wengmister.handtrackingstreamer 1
+```
 
-### immersive simulation
-<img src="https://github.com/user-attachments/assets/cc435e28-08a7-4f6c-8a25-6a36530657a2" width="500"><br>
+### 查找包名
 
-### dexterous retargeting
-<img src="https://github.com/user-attachments/assets/bcbbbfcc-f3f8-4f73-883c-ea7acac19d03" width="500">    
+```bash
+adb shell pm list packages | grep handtracking
+```
 
-Find more examples in SDK [here](https://github.com/wengmister/hand-tracking-sdk/tree/main/examples)
+### 强制停止 APK
 
-## Contact
+```bash
+adb shell am force-stop com.wengmister.handtrackingstreamer
+```
 
-For support or privacy inquiries related to Hand Tracking Streamer, please email: **wengmister@gmail.com**
+### 自动启动/停止
 
+本工程提供了 `run_quest_teleop.sh`。它会先启动 Quest APK，运行你传入的命令；
+命令正常结束或按 `Ctrl-C` 中断时，自动强制停止 Quest APK。
 
-## Citation
-If you use Hand Tracking Streamer in your research or project, please cite it as:
+```bash
+./run_quest_teleop.sh ros2 launch hand_tracking_robot dual_arm_hand_teleop.launch.py \
+  robot_left_ip:=192.168.71.37 \
+  robot_right_ip:=192.168.71.36 \
+  enable_left:=true enable_right:=true \
+  motion_scale:=0.40 \
+  use_rpy_ctrl:=false \
+  enable_y_limit:=true
+```
 
-      @software{weng2026hts,
-            author={Weng, Zhengyang K.},
-            title={Hand Tracking Streamer: Meta Quest VR App for Motion Capture and Teleoperation},
-            url={https://github.com/wengmister/hand-tracking-streamer},
-            year={2026}
-      }
+也可以把它包在任意命令外面：
 
+```bash
+./run_quest_teleop.sh ros2 launch jaka_driver RC_ctrl.launch.py ...
+```
 
-## License
-Apache-2.0
+如果你不想使用脚本，也可以手动执行上面的“启动 APK”和“强制停止 APK”命令。
+
+## 2. 准备 JAKA SDK 并编译
+
+先补齐 JAKA 官方动态库：
+
+```bash
+# 在已装 JAKA SDK 的机器上查找
+find /usr /opt /home -name 'libjakaAPI.so*' 2>/dev/null
+
+# 复制到指定位置
+cp /path/to/libjakaAPI.so \
+  ros2_ws/src/jaka_driver/sdk_lib/libjakaAPI.so
+```
+
+然后编译：
+
+```bash
+source /opt/ros/humble/setup.bash
+cd ros2_ws
+colcon build --symlink-install
+source install/setup.bash
+```
+
+没有 `libjakaAPI.so` 时也能编译，但不会生成 `rc_ctrl_node`；要控制机械臂必须补上
+SDK 并重新编译。每次重新编译后都要重新 `source install/setup.bash`。
+
+## 3. 先做无机械臂测试
+
+```bash
+cd ros2_ws
+source install/setup.bash
+python3 -m pytest src/hand_tracking_robot/test/test_hts_parser.py
+```
+
+终端 A 启动桥接：
+
+```bash
+source install/setup.bash
+ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
+  enable_left:=true enable_right:=true motion_scale:=0.40
+```
+
+终端 B 发送假手数据：
+
+```bash
+source install/setup.bash
+python3 src/hand_tracking_robot/test/fake_hand_stream.py \
+  --host 127.0.0.1 --port 9000 --pinch --both-hands
+```
+
+终端 C 观察：
+
+```bash
+source install/setup.bash
+ros2 topic echo /rc_ctrl/button
+ros2 topic echo /rc_ctrl/left_target
+ros2 topic echo /rc_ctrl/right_target
+```
+
+确认 `left_fresh/right_fresh`、`left_pinch/right_pinch` 和两个位姿话题正常。
+这一步没有启动 `rc_ctrl_node`，不会驱动机械臂。
+
+## 4. 真机顺序：先左臂，再右臂，最后双臂
+
+真机测试必须遵守：
+
+1. 机械臂工作范围内无人、无障碍，急停随时可及。
+2. 一人操作，另一人监护急停。
+3. 手指保持完全张开，只有准备移动机械臂时才捏合。
+4. 机械臂进入低速伺服前，不要开始 Quest HTS 传输。
+
+### 4.1 单左臂
+
+终端 A：
+
+```bash
+source ros2_ws/install/setup.bash
+ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
+  enable_left:=true enable_right:=false \
+  motion_scale:=0.40 smooth_alpha:=0.45
+```
+
+终端 B：
+
+```bash
+source ros2_ws/install/setup.bash
+ros2 launch jaka_driver RC_ctrl.launch.py \
+  robot_left_ip:=192.168.71.37 \
+  robot_right_ip:=192.168.71.36 \
+  use_rpy_ctrl:=false \
+  enable_y_limit:=true \
+  servo_filter_mode:=joint \
+  max_joint_vel:=40.0 \
+  max_joint_acc:=80.0
+```
+
+确认日志出现：
+
+```text
+left login OK
+left power_on OK
+left enable_robot OK
+left servo filter=joint vj=40.0 deg/s aj=80.0 deg/s^2 ...
+left servo enabled
+```
+
+然后打开 Quest HTS App：
+
+1. 手模式选 `Left`。
+2. 协议选 `UDP`，IP 填 Ubuntu 有线网卡 IP，端口 `9000`。
+3. 建议关闭 Debug Info。
+4. 手指完全张开，开始传输。
+5. 小幅度捏合并移动手腕，确认方向和急停。
+
+### 4.2 单右臂
+
+关闭上一组进程，桥接改成：
+
+```bash
+ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
+  enable_left:=false enable_right:=true \
+  motion_scale:=0.40 smooth_alpha:=0.45
+```
+
+Quest HTS App 手模式选 `Right`，其余相同。
+
+### 4.3 双臂
+
+```bash
+./run_quest_teleop.sh ros2 launch hand_tracking_robot dual_arm_hand_teleop.launch.py \
+  robot_left_ip:=192.168.71.37 \
+  robot_right_ip:=192.168.71.36 \
+  enable_left:=true enable_right:=true \
+  motion_scale:=0.40 smooth_alpha:=0.45 \
+  use_rpy_ctrl:=false \
+  enable_y_limit:=true \
+  servo_filter_mode:=joint \
+  max_joint_vel:=40.0 \
+  max_joint_acc:=80.0
+```
+
+Quest HTS App 手模式选 `Dual/Both`。确认左右 `pinch` 只在自己捏合时变 `1`。
+
+## 5. 遥操作映射：手怎么动，机械臂怎么动
+
+### 5.1 控制点是腕部
+
+默认 `position_source:=wrist`，所以驱动机械臂的是 **腕部的三维位置**，不是手指的
+21 个关节角。21 个手部骨骼点中：
+
+- 腕部 `wrist`：作为机械臂末端控制点。
+- 拇指尖和食指尖：只用于判断是否捏合。
+- 其他手指关节：默认不参与运动。
+
+也可以把控制点改成食指指尖或捏合中点：
+
+```bash
+position_source:=index_tip
+# 或
+position_source:=pinch_midpoint
+```
+
+### 5.2 是三维坐标映射，不是关节角映射
+
+HTS 的 `wrist` 是 Unity 左手系世界坐标，记为 `(x_u, y_u, z_u)`。桥接节点把它
+映射到 JAKA/ROS 右手系：
+
+```text
+默认 unity_to_robot:
+robot_x = -z_u
+robot_y = -x_u
+robot_z =  y_u
+```
+
+再乘 `motion_scale`，最后叠加静态 `tf_rotation` / `tf_translation`。
+
+因此**机械臂移动的是映射后的腕部“位置变化量”**，不是 Quest 世界里的绝对坐标。
+`rc_ctrl_node` 在捏合开始时刻记录原点，之后每个周期只发送：
+
+```text
+当前映射位置 - 上一次已执行映射位置
+```
+
+再经过死区、单步限幅和 JAKA 伺服滤波。
+
+### 5.3 实际操作时手怎么移动
+
+默认 `motion_scale=0.40`，即手移动 10 cm，机械臂移动约 4 cm。
+
+默认 `use_rpy_ctrl=false`，所以：
+
+- 手的**旋转不控制**机械臂姿态；
+- 只移动手腕做**平移**，机械臂末端做对应方向的平移。
+
+按照上面默认映射公式，在 Quest 世界轴不变的情况下：
+
+| 手/Quest 方向 | 机械臂方向 |
+| --- | --- |
+| Unity +Z（通常前方） | 机械臂 -X |
+| Unity +X（通常右方） | 机械臂 -Y |
+| Unity +Y（向上） | 机械臂 +Z |
+
+实际方向还会受 `tf_rotation`、机械臂安装方向和 Quest 标定影响，第一次真机先用
+极小幅度确认方向，再逐步增大动作。
+
+## 6. 关节 4 大幅度摆动的原因和修改
+
+当前遥操作只发送笛卡尔**平移增量**，姿态增量为零。JAKA 每个周期在内部求解逆运动学；
+当 TCP 经过奇异点附近、或腕部/肘部处于某些构型时，一个很小的末端平移就可能要求
+某个关节大幅旋转，最明显就是关节 4。
+
+之前代码只做了**笛卡尔**速度/加速度限制，没有限制**关节**速度。因此 TCP 速度虽然
+不高，但关节 4 仍可能突然快速摆动。
+
+现在默认改成：
+
+```text
+servo_filter_mode := joint
+max_joint_vel    := 40.0 deg/s
+max_joint_acc    := 80.0 deg/s^2
+max_joint_jerk   := 160.0 deg/s^3
+```
+
+这样每个关节的速度、加速度、加加速度都被限制，关节 4 不会突然猛甩。
+
+如果仍觉得不自然，可以继续调低：
+
+```bash
+servo_filter_mode:=joint \
+max_joint_vel:=20.0 \
+max_joint_acc:=40.0 \
+max_joint_jerk:=80.0
+```
+
+不建议在遥操作中改成 `servo_filter_mode:=cartesian`，因为它只限制 TCP，无法抑制
+奇异点附近的关节突变。
+
+## 7. 常用参数
+
+### 桥接参数
+
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `protocol` | `udp` | `udp` 或 `tcp` |
+| `host` | `0.0.0.0` | 监听地址 |
+| `port` | `9000` | 监听端口 |
+| `publish_rate` | `100.0` | 发布频率 Hz |
+| `position_source` | `wrist` | `wrist` / `index_tip` / `pinch_midpoint` |
+| `motion_scale` | `0.40` | 手部位移到机械臂位移比例 |
+| `smooth_alpha` | `0.45` | EMA 滤波系数，0 关闭 |
+| `pinch_threshold` | `0.035` | 捏合判定距离 m |
+| `pinch_release_ratio` | `1.5` | 松开滞回倍数 |
+| `tracking_timeout` | `1.0` | 手部丢失判定时间 s |
+| `enable_left` / `enable_right` | `true` | 是否发布左/右臂目标 |
+| `tf_translation` | `[0,0,0]` | Quest 原点在机器人基座下位置 |
+| `tf_rotation` | `[1,0,0,0]` | Quest 原点在机器人基座下姿态 `[w,x,y,z]` |
+| `unity_to_robot` | `[0,0,-1,-1,0,0,0,1,0]` | Unity 左手系到 ROS 右手系 3x3 映射 |
+
+### 机械臂运动参数
+
+| 参数 | 默认值 | 说明 |
+| --- | --- | --- |
+| `servo_filter_mode` | `joint` | `joint` 推荐；`cartesian` 只限制 TCP |
+| `servo_tran_deadband` | `0.25` | 平移死区 mm |
+| `servo_rot_deadband` | `0.005` | 姿态死区 rad |
+| `servo_max_tran_step` | `0.75` | 每个 `servo_p` 周期最大平移增量 mm |
+| `servo_max_rot_step` | `0.005` | 每个 `servo_p` 周期最大姿态增量 rad |
+| `max_joint_vel` | `40.0` | 关节速度上限 deg/s |
+| `max_joint_acc` | `80.0` | 关节加速度上限 deg/s² |
+| `max_joint_jerk` | `160.0` | 关节加加速度上限 deg/s³ |
+| `max_cart_vel` | `80.0` | `cartesian` 模式下 TCP 速度上限 mm/s |
+| `max_cart_acc` | `80.0` | `cartesian` 模式下 TCP 加速度上限 mm/s² |
+| `max_cart_jerk` | `160.0` | `cartesian` 模式下 TCP 加加速度上限 mm/s³ |
+
+## 8. 安全提示
+
+- `rc_ctrl_node` 启动成功后会自动登录、上电、使能并进入伺服模式。
+- 软件限速、捏合死停、手部丢失保持、双臂中线限制都只是辅助保护，不能替代
+  物理急停、安全围栏和人员监护。
+- 第一次真机从 `motion_scale:=0.40`、`servo_filter_mode:=joint` 开始，确认方向后再调整。
+- 松手捏合只是保持原位；彻底退出请 `Ctrl-C` 关闭 `rc_ctrl_node`，并确认示教器状态。
+
+## 9. 常见问题
+
+### `Package 'jaka_driver' not found`
+
+通常是没有 source overlay：
+
+```bash
+source /opt/ros/humble/setup.bash
+cd ros2_ws
+colcon build --symlink-install
+source install/setup.bash
+ros2 pkg prefix jaka_driver
+```
+
+### `rc_ctrl_node` 不存在
+
+说明 `libjakaAPI.so` 没有放入 `ros2_ws/src/jaka_driver/sdk_lib/`，补齐后重新编译。
+
+### Quest 数据收不到
+
+确认 Quest 与 Ubuntu 在同一网段，防火墙放行：
+
+```bash
+sudo ufw allow 9000/udp
+```
+
+确认桥接日志出现 `listening for HTS UDP on 0.0.0.0:9000`。

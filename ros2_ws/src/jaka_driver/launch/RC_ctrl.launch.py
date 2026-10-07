@@ -124,6 +124,18 @@ def generate_launch_description():
     max_rot_jerk_arg = DeclareLaunchArgument(
         'max_rot_jerk', default_value='80.0',
         description='Orientation servo jerk limit in deg/s^3')
+    servo_filter_mode_arg = DeclareLaunchArgument(
+        'servo_filter_mode', default_value='joint',
+        description="Servo limit mode: 'joint' (recommended) or 'cartesian'")
+    max_joint_vel_arg = DeclareLaunchArgument(
+        'max_joint_vel', default_value='40.0',
+        description='Joint servo speed limit in deg/s')
+    max_joint_acc_arg = DeclareLaunchArgument(
+        'max_joint_acc', default_value='80.0',
+        description='Joint servo acceleration limit in deg/s^2')
+    max_joint_jerk_arg = DeclareLaunchArgument(
+        'max_joint_jerk', default_value='160.0',
+        description='Joint servo jerk limit in deg/s^3')
 
     # One process per arm: the JAKA SDK holds a single global connection per
     # process, so each rc_ctrl_node instance drives exactly one robot. Two
@@ -171,6 +183,10 @@ def generate_launch_description():
             'max_rot_vel_deg_s': ParameterValue(LaunchConfiguration('max_rot_vel'), value_type=float),
             'max_rot_acc_deg_s2': ParameterValue(LaunchConfiguration('max_rot_acc'), value_type=float),
             'max_rot_jerk_deg_s3': ParameterValue(LaunchConfiguration('max_rot_jerk'), value_type=float),
+            'servo_filter_mode': LaunchConfiguration('servo_filter_mode'),
+            'max_joint_vel_deg_s': ParameterValue(LaunchConfiguration('max_joint_vel'), value_type=float),
+            'max_joint_acc_deg_s2': ParameterValue(LaunchConfiguration('max_joint_acc'), value_type=float),
+            'max_joint_jerk_deg_s3': ParameterValue(LaunchConfiguration('max_joint_jerk'), value_type=float),
         }]
     )
     rc_ctrl_right_node = Node(
@@ -215,6 +231,10 @@ def generate_launch_description():
             'max_rot_vel_deg_s': ParameterValue(LaunchConfiguration('max_rot_vel'), value_type=float),
             'max_rot_acc_deg_s2': ParameterValue(LaunchConfiguration('max_rot_acc'), value_type=float),
             'max_rot_jerk_deg_s3': ParameterValue(LaunchConfiguration('max_rot_jerk'), value_type=float),
+            'servo_filter_mode': LaunchConfiguration('servo_filter_mode'),
+            'max_joint_vel_deg_s': ParameterValue(LaunchConfiguration('max_joint_vel'), value_type=float),
+            'max_joint_acc_deg_s2': ParameterValue(LaunchConfiguration('max_joint_acc'), value_type=float),
+            'max_joint_jerk_deg_s3': ParameterValue(LaunchConfiguration('max_joint_jerk'), value_type=float),
         }]
     )
 
@@ -254,6 +274,10 @@ def generate_launch_description():
         max_rot_vel_arg,
         max_rot_acc_arg,
         max_rot_jerk_arg,
+        servo_filter_mode_arg,
+        max_joint_vel_arg,
+        max_joint_acc_arg,
+        max_joint_jerk_arg,
         rc_ctrl_left_node,
         rc_ctrl_right_node,
         LogInfo(msg="RC control nodes launched.")
