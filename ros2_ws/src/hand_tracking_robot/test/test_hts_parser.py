@@ -4,6 +4,7 @@ import pytest
 from hand_tracking_robot.hts_parser import (
     HandState,
     matrix_to_quat,
+    parse_head_pose_line,
     parse_hts_line,
     quat_rotate,
     quat_to_matrix,
@@ -31,6 +32,20 @@ def test_parse_debug_header():
 
 def test_parse_ignores_head_pose():
     assert parse_hts_line("Head pose:, 0.1, 0.2, 0.3, 0.0, 0.0, 0.0, 1.0") is None
+
+
+def test_parse_head_pose():
+    assert parse_head_pose_line(
+        "Head pose:, 0.1, 0.2, 0.3, 0.0, 0.0, 0.0, 1.0"
+    ) == (0.1, 0.2, 0.3, 0.0, 0.0, 0.0, 1.0)
+
+    assert parse_head_pose_line(
+        "Head pose | f = 4 | t = 123:, 0.1, 0.2, 0.3, 0.0, 0.0, 0.0, 1.0"
+    ) == (0.1, 0.2, 0.3, 0.0, 0.0, 0.0, 1.0)
+
+    assert parse_head_pose_line(
+        "Right wrist:, 0.1, 0.2, 0.3, 0.0, 0.0, 0.0, 1.0"
+    ) is None
 
 
 def test_quaternion_helpers_roundtrip():

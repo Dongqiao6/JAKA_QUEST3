@@ -287,6 +287,28 @@ robot_z =  y_u
 实际方向还会受 `tf_rotation`、机械臂安装方向和 Quest 标定影响，第一次真机先用
 极小幅度确认方向，再逐步增大动作。
 
+### 5.4 可切换的映射模式
+
+桥接节点新增了 `mapping_mode`，当前默认仍是 `world_wrist`，不会改变现有行为：
+
+```text
+world_wrist                 # 原行为：腕部 Unity 世界坐标增量
+head_relative_translation   # 只减去头显位置，仍保持 Unity 世界轴
+head_relative_local         # 旋转到头显局部系，前后/左右更直观
+```
+
+切换示例：
+
+```bash
+mapping_mode:=head_relative_translation
+# 或
+mapping_mode:=head_relative_local
+```
+
+使用后两种模式前，需要在 HTS App 中打开 **Head Pose / TrackHeadPose**，否则
+桥接节点会因头部位姿缺失自动回退到 `world_wrist`。头部位姿当前约 30 Hz，手部约
+100 Hz；实验阶段建议先只记录数据，确认 `head=(x,y,z)` 和相对向量稳定后再真机。
+
 ## 6. 关节 4 大幅度摆动的原因和修改
 
 当前遥操作只发送笛卡尔**平移增量**，姿态增量为零。JAKA 每个周期在内部求解逆运动学；
@@ -336,6 +358,8 @@ max_joint_jerk:=80.0
 | `pinch_release_ratio` | `1.5` | 松开滞回倍数 |
 | `tracking_timeout` | `1.0` | 手部丢失判定时间 s |
 | `enable_left` / `enable_right` | `true` | 是否发布左/右臂目标 |
+| `mapping_mode` | `world_wrist` | `world_wrist` / `head_relative_translation` / `head_relative_local` |
+| `head_timeout` | `1.0` | 头部位姿超时后 head-relative 模式自动回退 |
 | `tf_translation` | `[0,0,0]` | Quest 原点在机器人基座下位置 |
 | `tf_rotation` | `[1,0,0,0]` | Quest 原点在机器人基座下姿态 `[w,x,y,z]` |
 | `unity_to_robot` | `[0,0,-1,-1,0,0,0,1,0]` | Unity 左手系到 ROS 右手系 3x3 映射 |

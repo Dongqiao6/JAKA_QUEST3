@@ -36,7 +36,9 @@ from sensor_msgs.msg import Joy
 
 from hand_tracking_robot.hts_parser import (
     HandState,
+    HeadPoseState,
     matrix_to_quat,
+    parse_head_pose_line,
     parse_hts_line,
     quat_to_matrix,
 )
@@ -102,6 +104,21 @@ class HandTrackingBridge(Node):
             )
             self.position_source = "wrist"
 
+        self.mapping_mode = str(
+            self.declare_parameter("mapping_mode", "world_wrist").value
+        ).lower()
+        if self.mapping_mode not in (
+            "world_wrist",
+            "head_relative_translation",
+            "head_relative_local",
+        ):
+            self.get_logger().warn(
+                "unsupported mapping_mode '%s', falling back to 'world_wrist'"
+                % self.mapping_mode,
+            )
+            self.mapping_mode = "world_wrist"
+        self.head_timeout = float(self.declare_parameter("head_timeout", 1.0).value)
+
         # --- Coordinate transforms ----------------------------------------
         self.glasses_frame = str(self.declare_parameter("glasses_frame", "quest").value)
         self.robot_base_frame = str(self.declare_parameter("robot_base_frame", "world").value)
@@ -134,6 +151,7 @@ class HandTrackingBridge(Node):
             "left": HandState("left"),
             "right": HandState("right"),
         }
+        self.head_pose = HeadPoseState()
         self._filter_pos = {"left": None, "right": None}
         self._filter_quat = {"left": None, "right": None}
         self._pinched = {"left": False, "right": False}
@@ -153,16 +171,17 @@ class HandTrackingBridge(Node):
 
         self._start_network()
         self.get_logger().info(
-            "hand_tracking_bridge started: protocol=%s %s:%d, source=%s, "
-            "left=%s, right=%s, buttons=%s, rate=%.1f Hz"
-            % (
-                self.protocol,
-                self.host,
-                self.port,
-                self.position_source,
-                left_topic,
-                right_topic,
-                button_topic,
+                "hand_tracking_bridge started: protocol=%s %s:%d, source=%s, mapping=%s, "
+                "left=%s, right=%s, buttons=%s, rate=%.1f Hz"
+                % (
+                    self.protocol,
+                    self.host,
+                    self.port,
+                    self.position_source,
+                    self.mapping_mode,
+                    left_topic,
+                    right_topic,
+                    button_topic,
                 self.publish_rate,
             )
         )
@@ -188,6 +207,12 @@ class HandTrackingBridge(Node):
             self._handle_line(line.strip())
 
     def _handle_line(self, line: str) -> None:
+        head_values = parse_head_pose_line(line)
+        if head_values is not None:
+            with self._lock:
+                self.head_pose.update(head_values)
+            return
+
         parsed = parse_hts_line(line)
         if parsed is None:
             return
@@ -309,6 +334,37 @@ class HandTrackingBridge(Node):
                 self._pinched[side] = True
         return 1.0 if self._pinched[side] else 0.0
 
+    def _apply_mapping_mode(
+        self,
+        point_unity: np.ndarray,
+        head_position: Optional[np.ndarray],
+        head_quat: Optional[np.ndarray],
+        head_fresh: bool,
+    ) -> np.ndarray:
+        """Map a raw Unity control point according to ``mapping_mode``.
+
+        ``world_wrist`` is the existing behavior and is the safe default.
+        ``head_relative_translation`` removes head translation while keeping
+        Unity world axes. ``head_relative_local`` also rotates into the
+        headset's local frame, which is the more intuitive but more coupling-
+        sensitive mode for front/back/left/right.
+        """
+        if self.mapping_mode == "world_wrist":
+            return point_unity
+
+        if not head_fresh or head_position is None:
+            return point_unity
+
+        relative = np.asarray(point_unity, dtype=float) - head_position
+        if self.mapping_mode == "head_relative_translation":
+            return relative
+
+        if self.mapping_mode == "head_relative_local" and head_quat is not None:
+            head_rot = quat_to_matrix(head_quat)
+            return head_rot.T @ relative
+
+        return point_unity
+
     def _to_robot_pose(
         self, point_unity: np.ndarray, quat_unity: np.ndarray
     ) -> Tuple[np.ndarray, np.ndarray]:
@@ -359,6 +415,20 @@ class HandTrackingBridge(Node):
             right_quat = right.wrist_quat.copy() if right_fresh else None
             left_pinch = self._pinch_value("left", left, left_fresh and left_point is not None)
             right_pinch = self._pinch_value("right", right, right_fresh and right_point is not None)
+            head_fresh = self.head_pose.has_pose and (
+                now - self.head_pose.last_update
+            ) <= self.head_timeout
+            head_position = self.head_pose.position.copy() if head_fresh else None
+            head_quat = self.head_pose.quat.copy() if head_fresh else None
+
+        if left_point is not None:
+            left_point = self._apply_mapping_mode(
+                left_point, head_position, head_quat, head_fresh
+            )
+        if right_point is not None:
+            right_point = self._apply_mapping_mode(
+                right_point, head_position, head_quat, head_fresh
+            )
 
         if self.enable_left and left_point is not None and left_quat is not None:
             pos = self._ema_vec(self._filter_pos["left"], left_point, self.smooth_alpha)
@@ -394,10 +464,21 @@ class HandTrackingBridge(Node):
 
         self._publish_count += 1
         if self._publish_count % 50 == 0:
+            if head_fresh and head_position is not None:
+                head_str = "head=(%.3f,%.3f,%.3f)" % tuple(head_position)
+            else:
+                head_str = "head=--"
             self.get_logger().info(
                 "bridge active: left_pinch=%.0f right_pinch=%.0f "
-                "(left_fresh=%s right_fresh=%s)"
-                % (left_pinch, right_pinch, left_fresh, right_fresh),
+                "(left_fresh=%s right_fresh=%s) mapping=%s %s"
+                % (
+                    left_pinch,
+                    right_pinch,
+                    left_fresh,
+                    right_fresh,
+                    self.mapping_mode,
+                    head_str,
+                ),
             )
 
     def shutdown(self) -> None:

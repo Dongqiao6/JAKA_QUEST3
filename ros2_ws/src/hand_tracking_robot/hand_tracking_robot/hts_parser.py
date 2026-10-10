@@ -74,6 +74,38 @@ def parse_hts_line(line: str) -> Optional[Tuple[str, str, Tuple[float, ...]]]:
     return side, kind, tuple(floats)
 
 
+def parse_head_pose_line(line: str) -> Optional[Tuple[float, ...]]:
+    """Parse one HTS head-pose CSV line into 7 floats ``(x, y, z, qx, qy, qz, qw)``.
+
+    ``HandLandmarkStreamer`` and ``HeadPoseStreamer`` deliberately use separate
+    labels, so the hand parser above ignores head lines. This helper exists for
+    the bridge when a head-relative mapping mode is requested.
+    """
+    if not line:
+        return None
+
+    parts = [part.strip() for part in line.split(",")]
+    if not parts:
+        return None
+
+    label = parts[0].lower()
+    if "head" not in label or "pose" not in label:
+        return None
+
+    floats: List[float] = []
+    for part in parts[1:]:
+        if not part:
+            continue
+        try:
+            floats.append(float(part))
+        except ValueError:
+            continue
+
+    if len(floats) < 7:
+        return None
+    return tuple(floats[:7])
+
+
 def _normalize_quat(quat: np.ndarray) -> np.ndarray:
     """Normalize a quaternion in ``(x, y, z, w)`` order."""
     quat = np.asarray(quat, dtype=float)
@@ -200,3 +232,24 @@ class HandState:
                 return None
             return (thumb + index) * 0.5
         raise ValueError("unsupported position_source: %s" % source)
+
+
+@dataclass
+class HeadPoseState:
+    """Latest HTS head pose, still in Unity tracking-space coordinates."""
+
+    position: Optional[np.ndarray] = None
+    quat: Optional[np.ndarray] = None
+    last_update: float = field(default_factory=time.monotonic)
+
+    def update(self, values: Tuple[float, ...]) -> None:
+        if len(values) < 7:
+            return
+        arr = np.asarray(values, dtype=float)
+        self.position = arr[:3].copy()
+        self.quat = _normalize_quat(arr[3:7])
+        self.last_update = time.monotonic()
+
+    @property
+    def has_pose(self) -> bool:
+        return self.position is not None and self.quat is not None

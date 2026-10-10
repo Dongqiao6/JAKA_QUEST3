@@ -35,6 +35,12 @@ def generate_launch_description():
     position_source_arg = DeclareLaunchArgument(
         'position_source', default_value='wrist',
         description="Control point: 'wrist', 'index_tip', or 'pinch_midpoint'")
+    mapping_mode_arg = DeclareLaunchArgument(
+        'mapping_mode', default_value='world_wrist',
+        description="Mapping mode: 'world_wrist', 'head_relative_translation', or 'head_relative_local'")
+    head_timeout_arg = DeclareLaunchArgument(
+        'head_timeout', default_value='1.0',
+        description='Seconds without HTS head pose before head-relative modes fall back')
     left_topic_arg = DeclareLaunchArgument(
         'left_target_topic', default_value='/rc_ctrl/left_target')
     right_topic_arg = DeclareLaunchArgument(
@@ -75,6 +81,8 @@ def generate_launch_description():
             'pinch_release_ratio': ParameterValue(LaunchConfiguration('pinch_release_ratio'), value_type=float),
             'tracking_timeout': ParameterValue(LaunchConfiguration('tracking_timeout'), value_type=float),
             'position_source': LaunchConfiguration('position_source'),
+            'mapping_mode': LaunchConfiguration('mapping_mode'),
+            'head_timeout': ParameterValue(LaunchConfiguration('head_timeout'), value_type=float),
             'left_target_topic': LaunchConfiguration('left_target_topic'),
             'right_target_topic': LaunchConfiguration('right_target_topic'),
             'button_topic': LaunchConfiguration('button_topic'),
@@ -99,6 +107,8 @@ def generate_launch_description():
         pinch_release_ratio_arg,
         tracking_timeout_arg,
         position_source_arg,
+        mapping_mode_arg,
+        head_timeout_arg,
         left_topic_arg,
         right_topic_arg,
         button_topic_arg,
