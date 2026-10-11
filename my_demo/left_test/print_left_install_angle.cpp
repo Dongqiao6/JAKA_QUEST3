@@ -65,17 +65,25 @@ int main(int argc, char **argv)
     if (ret != ERR_SUCC)
     {
         std::printf("[diag] get_installation_angle FAILED ret=%d (%s)\n", ret, err_name(ret));
+        robot.login_out();
+        return 1;
     }
-    else
+
+    std::printf("[diag] installation quaternion (s,x,y,z): %.9f, %.9f, %.9f, %.9f\n",
+                quat.s, quat.x, quat.y, quat.z);
+    std::printf("[diag] installation rpy (rad): rx=%.9f ry=%.9f rz=%.9f\n",
+                rpy.rx, rpy.ry, rpy.rz);
+    std::printf("[diag] installation rpy (deg): rx=%.6f ry=%.6f rz=%.6f\n",
+                rpy.rx * 180.0 / 3.14159265358979323846,
+                rpy.ry * 180.0 / 3.14159265358979323846,
+                rpy.rz * 180.0 / 3.14159265358979323846);
+
+    const bool all_zero =
+        quat.s == 0.0 && quat.x == 0.0 && quat.y == 0.0 && quat.z == 0.0 &&
+        rpy.rx == 0.0 && rpy.ry == 0.0 && rpy.rz == 0.0;
+    if (all_zero)
     {
-        std::printf("[diag] installation quaternion (s,x,y,z): %.9f, %.9f, %.9f, %.9f\n",
-                    quat.s, quat.x, quat.y, quat.z);
-        std::printf("[diag] installation rpy (rad): rx=%.9f ry=%.9f rz=%.9f\n",
-                    rpy.rx, rpy.ry, rpy.rz);
-        std::printf("[diag] installation rpy (deg): rx=%.6f ry=%.6f rz=%.6f\n",
-                    rpy.rx * 180.0 / 3.14159265358979323846,
-                    rpy.ry * 180.0 / 3.14159265358979323846,
-                    rpy.rz * 180.0 / 3.14159265358979323846);
+        std::printf("[diag] RESULT: installation angle is ZERO (no rotation configured on this controller)\n");
     }
 
     ret = robot.login_out();
