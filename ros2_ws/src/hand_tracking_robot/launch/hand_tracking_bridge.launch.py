@@ -41,6 +41,9 @@ def generate_launch_description():
     head_timeout_arg = DeclareLaunchArgument(
         'head_timeout', default_value='1.0',
         description='Seconds without HTS head pose before head-relative modes fall back')
+    log_file_arg = DeclareLaunchArgument(
+        'log_file', default_value='logs/hand_tracking_bridge.log',
+        description='Local log file path; overwritten on every process start')
     left_topic_arg = DeclareLaunchArgument(
         'left_target_topic', default_value='/rc_ctrl/left_target')
     right_topic_arg = DeclareLaunchArgument(
@@ -83,6 +86,7 @@ def generate_launch_description():
             'position_source': LaunchConfiguration('position_source'),
             'mapping_mode': LaunchConfiguration('mapping_mode'),
             'head_timeout': ParameterValue(LaunchConfiguration('head_timeout'), value_type=float),
+            'log_file': LaunchConfiguration('log_file'),
             'left_target_topic': LaunchConfiguration('left_target_topic'),
             'right_target_topic': LaunchConfiguration('right_target_topic'),
             'button_topic': LaunchConfiguration('button_topic'),
@@ -109,6 +113,7 @@ def generate_launch_description():
         position_source_arg,
         mapping_mode_arg,
         head_timeout_arg,
+        log_file_arg,
         left_topic_arg,
         right_topic_arg,
         button_topic_arg,

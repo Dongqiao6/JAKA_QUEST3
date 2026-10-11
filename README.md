@@ -144,6 +144,24 @@ ros2 topic echo /rc_ctrl/right_target
 确认 `left_fresh/right_fresh`、`left_pinch/right_pinch` 和两个位姿话题正常。
 这一步没有启动 `rc_ctrl_node`，不会驱动机械臂。
 
+注意：`fake_hand_stream.py` 目前不发 `Head pose`，所以此时日志会显示 `head=--`；
+要验证 head pose 日志需要用 Quest 真机并打开 Head Pose / TrackHeadPose。
+
+### 日志文件
+
+`hand_tracking_bridge` 的日志会同时输出到终端和本地文件，默认路径：
+
+```text
+ros2_ws/logs/hand_tracking_bridge.log
+```
+
+每次进程启动都会**覆盖**上一次的日志内容。也可以启动时指定其他路径：
+
+```bash
+ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
+  log_file:=logs/my_hand_bridge.log
+```
+
 ## 4. 真机顺序：先左臂，再右臂，最后双臂
 
 真机测试必须遵守：
@@ -152,6 +170,50 @@ ros2 topic echo /rc_ctrl/right_target
 2. 一人操作，另一人监护急停。
 3. 手指保持完全张开，只有准备移动机械臂时才捏合。
 4. 机械臂进入低速伺服前，不要开始 Quest HTS 传输。
+
+### 4.0 修改后的映射模式怎么运行
+
+`hand_tracking_bridge` 现在支持 `mapping_mode`，默认仍是 `world_wrist`，所以不传
+参数时行为和以前完全一样：
+
+```text
+world_wrist                 # 默认：腕部 Unity 世界坐标增量
+head_relative_translation   # 减去头显位置，保留 Unity 世界轴
+head_relative_local         # 再旋转到头显局部系，前后/左右更直观
+```
+
+桥接节点单独运行时切换：
+
+```bash
+ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
+  enable_left:=true enable_right:=true \
+  mapping_mode:=head_relative_translation \
+  head_timeout:=1.0 \
+  motion_scale:=0.40 smooth_alpha:=0.45
+```
+
+一键双臂运行时切换：
+
+```bash
+./run_quest_teleop.sh ros2 launch hand_tracking_robot dual_arm_hand_teleop.launch.py \
+  robot_left_ip:=192.168.71.37 \
+  robot_right_ip:=192.168.71.36 \
+  enable_left:=true enable_right:=true \
+  mapping_mode:=head_relative_local \
+  head_timeout:=1.0 \
+  motion_scale:=0.40 smooth_alpha:=0.45 \
+  use_rpy_ctrl:=false \
+  enable_y_limit:=true
+```
+
+使用 `head_relative_translation` 或 `head_relative_local` 时，必须在 HTS App 中
+打开 **Head Pose / TrackHeadPose**。头部位姿约 30 Hz，桥接节点会打印：
+
+```text
+mapping=head_relative_translation head=(x,y,z)
+```
+
+如果没收到头部位姿，会显示 `head=--`，并自动回退到 `world_wrist`。
 
 ### 4.1 单左臂
 
@@ -193,8 +255,9 @@ left servo enabled
 1. 手模式选 `Left`。
 2. 协议选 `UDP`，IP 填 Ubuntu 有线网卡 IP，端口 `9000`。
 3. 建议关闭 Debug Info。
-4. 手指完全张开，开始传输。
-5. 小幅度捏合并移动手腕，确认方向和急停。
+4. 如果使用 head-relative 映射，打开 **Head Pose / TrackHeadPose**。
+5. 手指完全张开，开始传输。
+6. 小幅度捏合并移动手腕，确认方向和急停。
 
 ### 4.2 单右臂
 
@@ -360,6 +423,7 @@ max_joint_jerk:=80.0
 | `enable_left` / `enable_right` | `true` | 是否发布左/右臂目标 |
 | `mapping_mode` | `world_wrist` | `world_wrist` / `head_relative_translation` / `head_relative_local` |
 | `head_timeout` | `1.0` | 头部位姿超时后 head-relative 模式自动回退 |
+| `log_file` | `logs/hand_tracking_bridge.log` | 本地日志文件；每次启动覆盖上一次内容 |
 | `tf_translation` | `[0,0,0]` | Quest 原点在机器人基座下位置 |
 | `tf_rotation` | `[1,0,0,0]` | Quest 原点在机器人基座下姿态 `[w,x,y,z]` |
 | `unity_to_robot` | `[0,0,-1,-1,0,0,0,1,0]` | Unity 左手系到 ROS 右手系 3x3 映射 |

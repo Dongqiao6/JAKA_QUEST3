@@ -61,6 +61,7 @@ def generate_launch_description():
     position_source_arg = DeclareLaunchArgument('position_source', default_value='wrist')
     mapping_mode_arg = DeclareLaunchArgument('mapping_mode', default_value='world_wrist')
     head_timeout_arg = DeclareLaunchArgument('head_timeout', default_value='1.0')
+    log_file_arg = DeclareLaunchArgument('log_file', default_value='logs/hand_tracking_bridge.log')
     enable_left_arg = DeclareLaunchArgument('enable_left', default_value='true')
     enable_right_arg = DeclareLaunchArgument('enable_right', default_value='true')
     tf_translation_arg = DeclareLaunchArgument('tf_translation', default_value='[0.0, 0.0, 0.0]')
@@ -107,6 +108,7 @@ def generate_launch_description():
             'position_source': LaunchConfiguration('position_source'),
             'mapping_mode': LaunchConfiguration('mapping_mode'),
             'head_timeout': LaunchConfiguration('head_timeout'),
+            'log_file': LaunchConfiguration('log_file'),
             'enable_left': LaunchConfiguration('enable_left'),
             'enable_right': LaunchConfiguration('enable_right'),
             'tf_translation': LaunchConfiguration('tf_translation'),
@@ -143,6 +145,7 @@ def generate_launch_description():
         position_source_arg,
         mapping_mode_arg,
         head_timeout_arg,
+        log_file_arg,
         enable_left_arg,
         enable_right_arg,
         tf_translation_arg,

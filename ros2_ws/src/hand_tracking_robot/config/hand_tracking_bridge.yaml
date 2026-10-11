@@ -12,6 +12,7 @@ hand_tracking_bridge:
     position_source: wrist
     mapping_mode: world_wrist
     head_timeout: 1.0
+    log_file: logs/hand_tracking_bridge.log
 
     left_target_topic: /rc_ctrl/left_target
     right_target_topic: /rc_ctrl/right_target

@@ -21,6 +21,7 @@ the JAKA launch file remains false).
 from __future__ import annotations
 
 import json
+import os
 import socket
 import threading
 import time
@@ -69,6 +70,13 @@ class HandTrackingBridge(Node):
     def __init__(self) -> None:
         super().__init__("hand_tracking_bridge")
 
+        # --- Local log file -------------------------------------------------
+        self._log_lock = threading.Lock()
+        self._log_file_path = str(
+            self.declare_parameter("log_file", "logs/hand_tracking_bridge.log").value
+        )
+        self._log_file_handle = self._open_log_file()
+
         # --- Network input -------------------------------------------------
         self.protocol = str(self.declare_parameter("protocol", "udp").value).lower()
         self.host = str(self.declare_parameter("host", "0.0.0.0").value)
@@ -98,7 +106,8 @@ class HandTrackingBridge(Node):
         self.tracking_timeout = float(self.declare_parameter("tracking_timeout", 1.0).value)
         self.position_source = str(self.declare_parameter("position_source", "wrist").value).lower()
         if self.position_source not in ("wrist", "index_tip", "pinch_midpoint"):
-            self.get_logger().warn(
+            self._log(
+                "warn",
                 "unsupported position_source '%s', falling back to 'wrist'"
                 % self.position_source,
             )
@@ -112,7 +121,8 @@ class HandTrackingBridge(Node):
             "head_relative_translation",
             "head_relative_local",
         ):
-            self.get_logger().warn(
+            self._log(
+                "warn",
                 "unsupported mapping_mode '%s', falling back to 'world_wrist'"
                 % self.mapping_mode,
             )
@@ -170,21 +180,52 @@ class HandTrackingBridge(Node):
         self.timer = self.create_timer(1.0 / max(self.publish_rate, 1.0), self._publish_callback)
 
         self._start_network()
-        self.get_logger().info(
-                "hand_tracking_bridge started: protocol=%s %s:%d, source=%s, mapping=%s, "
-                "left=%s, right=%s, buttons=%s, rate=%.1f Hz"
-                % (
-                    self.protocol,
-                    self.host,
-                    self.port,
-                    self.position_source,
-                    self.mapping_mode,
-                    left_topic,
-                    right_topic,
-                    button_topic,
+        self._log(
+            "info",
+            "hand_tracking_bridge started: protocol=%s %s:%d, source=%s, mapping=%s, "
+            "left=%s, right=%s, buttons=%s, rate=%.1f Hz"
+            % (
+                self.protocol,
+                self.host,
+                self.port,
+                self.position_source,
+                self.mapping_mode,
+                left_topic,
+                right_topic,
+                button_topic,
                 self.publish_rate,
             )
         )
+
+    def _open_log_file(self):
+        """Open the local log file in overwrite mode for this process run."""
+        try:
+            path = os.path.abspath(self._log_file_path)
+            parent = os.path.dirname(path)
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            return open(path, "w", encoding="utf-8", buffering=1)
+        except OSError as exc:
+            self.get_logger().warn(
+                "cannot open log file '%s': %s; local file logging disabled"
+                % (self._log_file_path, exc)
+            )
+            return None
+
+    def _log(self, level: str, message: str) -> None:
+        """Write one log line to both the ROS console and the local log file."""
+        logger = self.get_logger()
+        getattr(logger, level)(message)
+
+        handle = getattr(self, "_log_file_handle", None)
+        if handle is None:
+            return
+
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        line = "[%s] [%s] %s\n" % (timestamp, level.upper(), message)
+        with self._log_lock:
+            handle.write(line)
+            handle.flush()
 
     # ------------------------------------------------------------------
     # Networking
@@ -231,12 +272,14 @@ class HandTrackingBridge(Node):
         try:
             sock.bind((self.host, self.port))
         except OSError as exc:
-            self.get_logger().error(
+            self._log(
+                "error",
                 "cannot bind UDP %s:%d: %s" % (self.host, self.port, exc)
             )
             return
         sock.settimeout(0.5)
-        self.get_logger().info(
+        self._log(
+            "info",
             "listening for HTS UDP on %s:%d" % (self.host, self.port)
         )
         while not self._stop.is_set():
@@ -255,13 +298,15 @@ class HandTrackingBridge(Node):
         try:
             server.bind((self.host, self.port))
         except OSError as exc:
-            self.get_logger().error(
+            self._log(
+                "error",
                 "cannot bind TCP %s:%d: %s" % (self.host, self.port, exc)
             )
             return
         server.listen(5)
         server.settimeout(0.5)
-        self.get_logger().info(
+        self._log(
+            "info",
             "listening for HTS TCP on %s:%d" % (self.host, self.port)
         )
         while not self._stop.is_set():
@@ -277,7 +322,7 @@ class HandTrackingBridge(Node):
         server.close()
 
     def _tcp_conn_loop(self, conn: socket.socket, addr) -> None:
-        self.get_logger().info("HTS TCP connection from %s" % (addr,))
+        self._log("info", "HTS TCP connection from %s" % (addr,))
         conn.settimeout(0.5)
         buffer = ""
         with conn:
@@ -468,7 +513,8 @@ class HandTrackingBridge(Node):
                 head_str = "head=(%.3f,%.3f,%.3f)" % tuple(head_position)
             else:
                 head_str = "head=--"
-            self.get_logger().info(
+            self._log(
+                "info",
                 "bridge active: left_pinch=%.0f right_pinch=%.0f "
                 "(left_fresh=%s right_fresh=%s) mapping=%s %s"
                 % (
@@ -483,6 +529,9 @@ class HandTrackingBridge(Node):
 
     def shutdown(self) -> None:
         self._stop.set()
+        handle = getattr(self, "_log_file_handle", None)
+        if handle is not None:
+            handle.close()
 
 
 def main(args=None) -> None:
