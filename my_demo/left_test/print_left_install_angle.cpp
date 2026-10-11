@@ -86,6 +86,38 @@ int main(int argc, char **argv)
         std::printf("[diag] RESULT: installation angle is ZERO (no rotation configured on this controller)\n");
     }
 
+    JointValue joint_pos{};
+    ret = robot.get_joint_position(&joint_pos);
+    if (ret == ERR_SUCC)
+    {
+        std::printf("[diag] joint position (deg):");
+        for (int i = 0; i < 6; ++i)
+        {
+            std::printf(" j%d=%.4f", i + 1, joint_pos.jVal[i] * 180.0 / 3.14159265358979323846);
+        }
+        std::printf("\n");
+    }
+    else
+    {
+        std::printf("[diag] get_joint_position FAILED ret=%d (%s)\n", ret, err_name(ret));
+    }
+
+    CartesianPose tcp{};
+    ret = robot.get_tcp_position(&tcp);
+    if (ret == ERR_SUCC)
+    {
+        std::printf("[diag] tcp position (mm): x=%.3f y=%.3f z=%.3f\n",
+                    tcp.tran.x, tcp.tran.y, tcp.tran.z);
+        std::printf("[diag] tcp rpy (deg): rx=%.4f ry=%.4f rz=%.4f\n",
+                    tcp.rpy.rx * 180.0 / 3.14159265358979323846,
+                    tcp.rpy.ry * 180.0 / 3.14159265358979323846,
+                    tcp.rpy.rz * 180.0 / 3.14159265358979323846);
+    }
+    else
+    {
+        std::printf("[diag] get_tcp_position FAILED ret=%d (%s)\n", ret, err_name(ret));
+    }
+
     ret = robot.login_out();
     std::printf("[diag] login_out ret=%d (%s)\n", ret, err_name(ret));
     return ret == ERR_SUCC ? 0 : 1;
