@@ -108,6 +108,14 @@ source install/setup.bash
 没有 `libjakaAPI.so` 时也能编译，但不会生成 `rc_ctrl_node`；要控制机械臂必须补上
 SDK 并重新编译。每次重新编译后都要重新 `source install/setup.bash`。
 
+如果只改了 `hand_tracking_robot` 里的 Python 代码或 launch 文件，可以只编译这个包：
+
+```bash
+cd ros2_ws
+colcon build --symlink-install --packages-select hand_tracking_robot
+source install/setup.bash
+```
+
 ## 3. 先做无机械臂测试
 
 ```bash
@@ -372,6 +380,60 @@ mapping_mode:=head_relative_local
 桥接节点会因头部位姿缺失自动回退到 `world_wrist`。头部位姿当前约 30 Hz，手部约
 100 Hz；实验阶段建议先只记录数据，确认 `head=(x,y,z)` 和相对向量稳定后再真机。
 
+### 5.5 左右臂镜像安装的基座旋转
+
+双臂镜像安装时，左右臂的基座坐标系并不相同。桥接节点会先把 Quest 手部位姿转换到
+统一的机器人世界坐标，再按每只臂自己的旋转转到该臂基座坐标。
+
+新增参数：
+
+```text
+left_arm_rotation   # 左臂基座旋转 [w,x,y,z]，默认 [0,0,0,1] = 绕 Z 轴 180°
+right_arm_rotation  # 右臂基座旋转 [w,x,y,z]，默认 [1,0,0,0] = 不旋转
+```
+
+默认值对应常见的左右臂镜像安装。只启动桥接节点时可以这样显式指定：
+
+```bash
+ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
+  enable_left:=true enable_right:=true \
+  left_arm_rotation:='[0.0,0.0,0.0,1.0]' \
+  right_arm_rotation:='[1.0,0.0,0.0,0.0]'
+```
+
+一键双臂运行时同样可以覆盖：
+
+```bash
+./run_quest_teleop.sh ros2 launch hand_tracking_robot dual_arm_hand_teleop.launch.py \
+  robot_left_ip:=192.168.71.37 \
+  robot_right_ip:=192.168.71.36 \
+  enable_left:=true enable_right:=true \
+  left_arm_rotation:='[0.0,0.0,0.0,1.0]' \
+  right_arm_rotation:='[1.0,0.0,0.0,0.0]'
+```
+
+如果左臂方向仍然不对，先尝试把左臂旋转关掉：
+
+```bash
+left_arm_rotation:='[1.0,0.0,0.0,0.0]'
+```
+
+如果关掉后回到原来的奇怪行为，而默认 `[0,0,0,1]` 又方向相反，则可以尝试绕 Y 轴
+180°：
+
+```bash
+left_arm_rotation:='[0.0,0.0,1.0,0.0]'
+```
+
+验证时建议先只开左臂、用极小的 `motion_scale` 做慢速测试：
+
+```bash
+ros2 launch hand_tracking_robot hand_tracking_bridge.launch.py \
+  enable_left:=true enable_right:=false \
+  motion_scale:=0.20 \
+  left_arm_rotation:='[0.0,0.0,0.0,1.0]'
+```
+
 ## 6. 关节 4 大幅度摆动的原因和修改
 
 当前遥操作只发送笛卡尔**平移增量**，姿态增量为零。JAKA 每个周期在内部求解逆运动学；
@@ -426,6 +488,8 @@ max_joint_jerk:=80.0
 | `log_file` | `logs/hand_tracking_bridge.log` | 本地日志文件；每次启动覆盖上一次内容 |
 | `tf_translation` | `[0,0,0]` | Quest 原点在机器人基座下位置 |
 | `tf_rotation` | `[1,0,0,0]` | Quest 原点在机器人基座下姿态 `[w,x,y,z]` |
+| `left_arm_rotation` | `[0,0,0,1]` | 左臂基座旋转 `[w,x,y,z]`；默认绕 Z 轴 180°，用于双臂镜像安装 |
+| `right_arm_rotation` | `[1,0,0,0]` | 右臂基座旋转 `[w,x,y,z]`；默认无旋转 |
 | `unity_to_robot` | `[0,0,-1,-1,0,0,0,1,0]` | Unity 左手系到 ROS 右手系 3x3 映射 |
 
 ### 机械臂运动参数

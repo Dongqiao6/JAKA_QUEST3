@@ -156,6 +156,19 @@ class HandTrackingBridge(Node):
         # tf_rotation is [w, x, y, z]; quat_to_matrix wants [x, y, z, w].
         self.rot_base = quat_to_matrix(tf_rotation[[1, 2, 3, 0]])
 
+        # 左右臂各自的基座旋转（[w, x, y, z]）。双臂镜像安装时，左臂通常
+        # 需要绕 Z 轴旋转 180 度，把公共世界坐标转到左臂自身基座坐标。
+        left_arm_rotation = _parse_float_list(
+            self.declare_parameter("left_arm_rotation", [0.0, 0.0, 0.0, 1.0]).value,
+            expected=4,
+        )
+        right_arm_rotation = _parse_float_list(
+            self.declare_parameter("right_arm_rotation", [1.0, 0.0, 0.0, 0.0]).value,
+            expected=4,
+        )
+        self.left_arm_rot = quat_to_matrix(left_arm_rotation[[1, 2, 3, 0]])
+        self.right_arm_rot = quat_to_matrix(right_arm_rotation[[1, 2, 3, 0]])
+
         # --- State and threads --------------------------------------------
         self.hands: Dict[str, HandState] = {
             "left": HandState("left"),
@@ -411,21 +424,27 @@ class HandTrackingBridge(Node):
         return point_unity
 
     def _to_robot_pose(
-        self, point_unity: np.ndarray, quat_unity: np.ndarray
+        self,
+        point_unity: np.ndarray,
+        quat_unity: np.ndarray,
+        arm_rot: np.ndarray,
     ) -> Tuple[np.ndarray, np.ndarray]:
         """Map a raw Unity point/quaternion to robot-base frame.
 
         Returns ``(position, quaternion)`` with quaternion in ``(x, y, z, w)``
         order. The static ``tf_translation``/``tf_rotation`` parameters express
-        the glasses frame origin in robot-base coordinates.
+        the glasses frame origin in the shared robot world frame. ``arm_rot``
+        then maps that shared frame into the individual arm's base frame.
         """
         glasses_pos = self.unity_to_robot @ point_unity
         glasses_pos = glasses_pos * self.motion_scale
-        robot_pos = self.rot_base @ glasses_pos + self.tf_translation
+        world_pos = self.rot_base @ glasses_pos + self.tf_translation
+        robot_pos = arm_rot @ world_pos
 
         r_glasses = self.unity_to_robot @ quat_to_matrix(quat_unity) @ self.unity_to_robot.T
         q_glasses = matrix_to_quat(r_glasses)
-        r_robot = self.rot_base @ quat_to_matrix(q_glasses)
+        r_world = self.rot_base @ quat_to_matrix(q_glasses)
+        r_robot = arm_rot @ r_world
         q_robot = matrix_to_quat(r_robot)
         return robot_pos, q_robot
 
@@ -480,7 +499,7 @@ class HandTrackingBridge(Node):
             quat = self._ema_quat(self._filter_quat["left"], left_quat, self.smooth_alpha)
             self._filter_pos["left"] = pos
             self._filter_quat["left"] = quat
-            robot_pos, robot_quat = self._to_robot_pose(pos, quat)
+            robot_pos, robot_quat = self._to_robot_pose(pos, quat, self.left_arm_rot)
             self.left_pub.publish(self._pose_msg(stamp, self.robot_base_frame, robot_pos, robot_quat))
 
         if self.enable_right and right_point is not None and right_quat is not None:
@@ -488,7 +507,7 @@ class HandTrackingBridge(Node):
             quat = self._ema_quat(self._filter_quat["right"], right_quat, self.smooth_alpha)
             self._filter_pos["right"] = pos
             self._filter_quat["right"] = quat
-            robot_pos, robot_quat = self._to_robot_pose(pos, quat)
+            robot_pos, robot_quat = self._to_robot_pose(pos, quat, self.right_arm_rot)
             self.right_pub.publish(self._pose_msg(stamp, self.robot_base_frame, robot_pos, robot_quat))
 
         joy = Joy()

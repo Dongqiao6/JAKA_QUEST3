@@ -66,6 +66,10 @@ def generate_launch_description():
     enable_right_arg = DeclareLaunchArgument('enable_right', default_value='true')
     tf_translation_arg = DeclareLaunchArgument('tf_translation', default_value='[0.0, 0.0, 0.0]')
     tf_rotation_arg = DeclareLaunchArgument('tf_rotation', default_value='[1.0, 0.0, 0.0, 0.0]')
+    left_arm_rotation_arg = DeclareLaunchArgument(
+        'left_arm_rotation', default_value='[0.0, 0.0, 0.0, 1.0]')
+    right_arm_rotation_arg = DeclareLaunchArgument(
+        'right_arm_rotation', default_value='[1.0, 0.0, 0.0, 0.0]')
 
     rc_ctrl_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource([
@@ -113,6 +117,8 @@ def generate_launch_description():
             'enable_right': LaunchConfiguration('enable_right'),
             'tf_translation': LaunchConfiguration('tf_translation'),
             'tf_rotation': LaunchConfiguration('tf_rotation'),
+            'left_arm_rotation': LaunchConfiguration('left_arm_rotation'),
+            'right_arm_rotation': LaunchConfiguration('right_arm_rotation'),
         }.items(),
     )
 
@@ -150,6 +156,8 @@ def generate_launch_description():
         enable_right_arg,
         tf_translation_arg,
         tf_rotation_arg,
+        left_arm_rotation_arg,
+        right_arm_rotation_arg,
         rc_ctrl_launch,
         bridge_launch,
     ])
