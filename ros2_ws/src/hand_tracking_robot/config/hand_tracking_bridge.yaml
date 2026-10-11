@@ -31,7 +31,7 @@ hand_tracking_bridge:
     tf_translation: [0.0, 0.0, 0.0]
     tf_rotation: [1.0, 0.0, 0.0, 0.0]
 
-    # Per-arm base rotation ([w, x, y, z]). Left default is 180 deg about Z
-    # because the two arms are mounted mirrored.
-    left_arm_rotation: [0.0, 0.0, 0.0, 1.0]
+    # Per-arm base rotation ([w, x, y, z]). Default matches RemoteCtrl:
+    # no mirror between left and right.
+    left_arm_rotation: [1.0, 0.0, 0.0, 0.0]
     right_arm_rotation: [1.0, 0.0, 0.0, 0.0]

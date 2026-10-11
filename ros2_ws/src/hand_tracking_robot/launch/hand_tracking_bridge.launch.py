@@ -64,8 +64,8 @@ def generate_launch_description():
         'tf_rotation', default_value='[1.0, 0.0, 0.0, 0.0]',
         description='Glasses orientation in robot base [w, x, y, z]')
     left_arm_rotation_arg = DeclareLaunchArgument(
-        'left_arm_rotation', default_value='[0.0, 0.0, 0.0, 1.0]',
-        description='Left arm base rotation [w, x, y, z]; default is 180 deg about Z for mirrored arms')
+        'left_arm_rotation', default_value='[1.0, 0.0, 0.0, 0.0]',
+        description='Left arm base rotation [w, x, y, z]; default matches RemoteCtrl (no mirror)')
     right_arm_rotation_arg = DeclareLaunchArgument(
         'right_arm_rotation', default_value='[1.0, 0.0, 0.0, 0.0]',
         description='Right arm base rotation [w, x, y, z]')

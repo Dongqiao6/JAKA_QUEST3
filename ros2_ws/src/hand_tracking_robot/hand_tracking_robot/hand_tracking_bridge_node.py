@@ -156,10 +156,10 @@ class HandTrackingBridge(Node):
         # tf_rotation is [w, x, y, z]; quat_to_matrix wants [x, y, z, w].
         self.rot_base = quat_to_matrix(tf_rotation[[1, 2, 3, 0]])
 
-        # 左右臂各自的基座旋转（[w, x, y, z]）。双臂镜像安装时，左臂通常
-        # 需要绕 Z 轴旋转 180 度，把公共世界坐标转到左臂自身基座坐标。
+        # 左右臂各自的基座旋转（[w, x, y, z]）。默认与 RemoteCtrl 的
+        # quest_reader 一致：左右手柄/手部使用同一套坐标映射，不做镜像。
         left_arm_rotation = _parse_float_list(
-            self.declare_parameter("left_arm_rotation", [0.0, 0.0, 0.0, 1.0]).value,
+            self.declare_parameter("left_arm_rotation", [1.0, 0.0, 0.0, 0.0]).value,
             expected=4,
         )
         right_arm_rotation = _parse_float_list(

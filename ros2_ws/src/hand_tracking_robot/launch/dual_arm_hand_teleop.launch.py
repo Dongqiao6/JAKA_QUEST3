@@ -67,7 +67,7 @@ def generate_launch_description():
     tf_translation_arg = DeclareLaunchArgument('tf_translation', default_value='[0.0, 0.0, 0.0]')
     tf_rotation_arg = DeclareLaunchArgument('tf_rotation', default_value='[1.0, 0.0, 0.0, 0.0]')
     left_arm_rotation_arg = DeclareLaunchArgument(
-        'left_arm_rotation', default_value='[0.0, 0.0, 0.0, 1.0]')
+        'left_arm_rotation', default_value='[1.0, 0.0, 0.0, 0.0]')
     right_arm_rotation_arg = DeclareLaunchArgument(
         'right_arm_rotation', default_value='[1.0, 0.0, 0.0, 0.0]')
 
